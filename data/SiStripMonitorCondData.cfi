@@ -1,0 +1,119 @@
+module CondDataMonitoring = SiStripMonitorCondData {
+	
+      string OutputFileName="SiStripMonitorCondData.root"
+      
+      bool OutputMEsInRootFile          = true
+      
+      bool MonitorSiStripPedestal       = true
+      bool MonitorSiStripNoise          = true
+      bool MonitorSiStripQuality        = false
+      bool MonitorSiStripApvGain        = false  
+      
+      
+      PSet FillConditions_PSet = {
+        
+	bool Mod_On   = false 
+ 	bool SummaryOnLayerLevel_On = true 
+      
+	string StripQualityLabel="test1"
+   
+        // *** exclude OR include a set of modules
+        bool excludeModules = false        // false(default)
+        
+	vuint32 ModulesToBeIncluded = { }
+        vuint32 ModulesToBeExcluded = { }
+	
+	
+	// *** exclude a subdetector 
+        vstring SubDetectorsToBeExcluded = {"none"}  // possibilities : "none" or
+	                                             // combinations of "TIB","TOB","TID","TEC" 
+    
+        // *** other restricting specifications
+        string ModulesToBeFilled ="all"  // possibilities :  "all"(default) or "onlyOneModulePerLayer"
+      }
+ 
+      // -----
+      PSet SiStripPedestalsDQM_PSet = { 
+
+	string CondObj_fillId = "onlyProfile" 
+	string CondObj_name     = "pedestal"  
+
+
+	string Profile_description = "PedestalFromCondDB_Profile"
+        string Profile_xTitle      = "Strip Number"
+        string Profile_yTitle      = "Pedestal from CondDB(ADC)"
+	
+	string SummaryOfProfile_description = "PedestalFromCondDB_ProfileSummary"
+        string SummaryOfProfile_xTitle      = "Strip Number"
+        string SummaryOfProfile_yTitle      = "Pedestal from CondDB(ADC)"
+      }
+
+
+      // -----
+      PSet SiStripNoisesDQM_PSet = {  
+ 	
+	string CondObj_fillId = "onlyProfile" // both profile and cumul implemented 
+	                                      // possibilities "onlyProfile", "onlyCumul", "ProfileAndCumul"
+	string CondObj_name     = "noise"  
+        
+	
+	string Profile_description = "NoiseFromCondDB_Profile"
+        string Profile_xTitle      = "Strip Number"
+        string Profile_yTitle      = "Noise from CondDB(ADC)"
+	
+	string Cumul_description   = "NoiseFromCondDB_Cumul"
+        string Cumul_xTitle        = "Noise from CondDB(ADC)"
+        string Cumul_yTitle        = " "
+	int32  Cumul_NchX          = 11
+	double Cumul_LowX          = -0.5
+	double Cumul_HighX         = 10.5
+	
+	string SummaryOfProfile_description = "NoiseFromCondDB_ProfileSummary"
+        string SummaryOfProfile_xTitle      = "Strip Number"
+        string SummaryOfProfile_yTitle      = "Noise from CondDB(ADC)"
+	
+	string SummaryOfCumul_description = "NoiseFromCondDB_CumulSummary"
+        string SummaryOfCumul_xTitle      = "Noise from CondDB(ADC)"
+        string SummaryOfCumul_yTitle      = " "
+	
+	int32  SummaryOfCumul_NchX          = 11
+	double SummaryOfCumul_LowX          = -0.5
+	double SummaryOfCumul_HighX         = 10.5
+	
+      }
+
+
+      // -----
+      PSet SiStripQualityDQM_PSet = {	
+ 	
+	string CondObj_fillId   = "onlyProfile"
+        string CondObj_name     = "quality"  
+
+                                     
+	string Profile_description = "QualityFlagFromCondDB_Profile"
+        string Profile_xTitle      = "Strip Number"
+        string Profile_yTitle      = "Quality Flag from CondDB"
+	
+        }
+
+
+      // -----
+      PSet SiStripApvGainsDQM_PSet = {  
+      
+	string CondObj_fillId = "ProfileAndCumul" // possibilities "ProfileAndCumul" "onlyProfile", "onlyCumul"
+        string CondObj_name     = "apvgain"  
+	          
+        
+	string Profile_description = "ApvGainFromCondDB_Profile"
+        string Profile_xTitle      = "Apv Number" 
+        string Profile_yTitle      = "ApvGain from CondDB"
+	
+	string Cumul_description   = "ApvGainFromCondDB_Cumul"
+        string Cumul_xTitle        = "ApvGain from CondDB"
+        string Cumul_yTitle        = " "
+	int32  Cumul_NchX          = 30
+	double Cumul_LowX          = 0.
+	double Cumul_HighX         = 1.5		
+      }
+      
+    }

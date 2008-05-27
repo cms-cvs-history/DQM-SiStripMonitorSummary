@@ -6,13 +6,14 @@ module CondDataMonitoring = SiStripMonitorCondData {
       
       bool MonitorSiStripPedestal       = true
       bool MonitorSiStripNoise          = true
-      bool MonitorSiStripQuality        = false
-      bool MonitorSiStripApvGain        = false  
+      bool MonitorSiStripQuality        = true
+      bool MonitorSiStripApvGain        = true  
+      bool MonitorSiStripLorentzAngle   = true  
       
       
       PSet FillConditions_PSet = {
         
-	bool Mod_On   = false 
+	bool Mod_On   = true
  	bool SummaryOnLayerLevel_On = true 
       
 	string StripQualityLabel="test1"
@@ -52,7 +53,7 @@ module CondDataMonitoring = SiStripMonitorCondData {
       // -----
       PSet SiStripNoisesDQM_PSet = {  
  	
-	string CondObj_fillId = "onlyProfile" // both profile and cumul implemented 
+	string CondObj_fillId = "ProfileAndCumul" // both profile and cumul implemented 
 	                                      // possibilities "onlyProfile", "onlyCumul", "ProfileAndCumul"
 	string CondObj_name     = "noise"  
         
@@ -100,7 +101,7 @@ module CondDataMonitoring = SiStripMonitorCondData {
       // -----
       PSet SiStripApvGainsDQM_PSet = {  
       
-	string CondObj_fillId = "ProfileAndCumul" // possibilities "ProfileAndCumul" "onlyProfile", "onlyCumul"
+	string CondObj_fillId   = "ProfileAndCumul" // possibilities "ProfileAndCumul" "onlyProfile", "onlyCumul"
         string CondObj_name     = "apvgain"  
 	          
         
@@ -113,7 +114,45 @@ module CondDataMonitoring = SiStripMonitorCondData {
         string Cumul_yTitle        = " "
 	int32  Cumul_NchX          = 30
 	double Cumul_LowX          = 0.
-	double Cumul_HighX         = 1.5		
+	double Cumul_HighX         = 1.5
+			
+        string SummaryOfProfile_description = "ApvGainFromCondDB_ProfileSummary"
+        string SummaryOfProfile_xTitle      = "Apv Number"
+        string SummaryOfProfile_yTitle      = "ApvGain from CondDB"
+
+        string SummaryOfCumul_description   = "ApvGainFromCondDB_CumulSummary"
+        string SummaryOfCumul_xTitle        = "ApvGain from CondDB"
+        string SummaryOfCumul_yTitle        = " "
+
+        int32  SummaryOfCumul_NchX          = 30
+        double SummaryOfCumul_LowX          = 0.
+        double SummaryOfCumul_HighX         = 1.5
+        
+	}
+      
+      // -----
+      PSet SiStripLorentzAngleDQM_PSet = {  
+      
+	string CondObj_fillId   = "ProfileAndCumul" // possibilities "ProfileAndCumul" "onlyProfile", "onlyCumul"
+        string CondObj_name     = "lorentzangle"  
+	          
+        
+	string SummaryOfProfile_description = "LorentzAngleFromCondDB_ProfileSummary"
+        string SummaryOfProfile_xTitle      = "detId" 
+        string SummaryOfProfile_yTitle      = "LorentzAngle from CondDB"
+	
+	string SummaryOfCumul_description   = "LorentzAngleFromCondDB_CumulSummary"
+        string SummaryOfCumul_xTitle        = "LorentzAngle from CondDB"
+        string SummaryOfCumul_yTitle        = " "
+	
+	int32  SummaryOfCumul_NchX          = 50
+	double SummaryOfCumul_LowX          = 0.
+	double SummaryOfCumul_HighX         = 0.05		
       }
+      
+      
+     
+      
+      
       
     }

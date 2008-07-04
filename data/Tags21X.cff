@@ -1,11 +1,11 @@
 es_source siStripCond = poolDBESSource from "CalibTracker/Configuration/data/Common/PoolDBESSource.cfi"
 replace siStripCond.toGet = {
-                    { string record = "SiStripFedCablingRcd" string tag = "TKCC_21X_SiStripFedCabling_test1" },
+                    { string record = "SiStripFedCablingRcd" string tag = "SiStripFedCabling_TKCC_21X_test1" },
                     { string record = "SiStripApvGainRcd" string tag = "SiStripGain_StartUp_20X_mc" },
                     { string record = "SiStripLorentzAngleRcd" string tag = "SiStripLorentzAngle_StartUp_20X_mc" },
-                    { string record = "SiStripNoisesRcd" string tag = "TKCC_21X_SiStripNoise_test1" },
-                    { string record = "SiStripPedestalsRcd" string tag = "TKCC_21X_SiStripPedestals_test1" },
-                    { string record = "SiStripThresholdRcd" string tag = "TKCC_21X_SiStripThreshold_test1" },
+                    { string record = "SiStripNoisesRcd" string tag = "SiStripNoise_TKCC_21X_test1" },
+                    { string record = "SiStripPedestalsRcd" string tag = "SiStripPedestals_TKCC_21X_test1" },
+                    { string record = "SiStripThresholdRcd" string tag = "SiStripThreshold_TKCC_21X_test1" },
 
 }
 replace siStripCond.connect="frontier://Frontier/CMS_COND_21X_STRIP"

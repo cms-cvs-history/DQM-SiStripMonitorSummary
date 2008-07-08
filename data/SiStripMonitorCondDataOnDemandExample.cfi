@@ -1,7 +1,7 @@
 
-module CondDataMonitoring = SiStripMonitorCondData {
+module myOnDemandExample = SiStripMonitorCondDataOnDemandExample {
 	
-      string OutputFileName="SiStripMonitorCondData.root"
+      string OutputFileName="SiStripMonitorCondDataOnDemandExample.root"
       
       bool OutputMEsInRootFile          = false
       

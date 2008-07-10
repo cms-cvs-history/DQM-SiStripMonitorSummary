@@ -5,16 +5,16 @@ module CondDataMonitoring = SiStripMonitorCondData {
       
       bool OutputMEsInRootFile          = false
       
-      bool MonitorSiStripPedestal       = true
+      bool MonitorSiStripPedestal       = false
       bool MonitorSiStripNoise          = true
-      bool MonitorSiStripQuality        = true
-      bool MonitorSiStripApvGain        = true  
-      bool MonitorSiStripLorentzAngle   = true  
+      bool MonitorSiStripQuality        = false
+      bool MonitorSiStripApvGain        = false 
+      bool MonitorSiStripLorentzAngle   = false 
       
       
       PSet FillConditions_PSet = {
         
-	bool Mod_On   = false
+	bool Mod_On   = true
  	bool SummaryOnLayerLevel_On = true 
  	bool SummaryOnStringLevel_On = false
       
@@ -67,10 +67,10 @@ module CondDataMonitoring = SiStripMonitorCondData {
       // -----
       PSet SiStripNoisesDQM_PSet = {  
  	
-	string CondObj_fillId = "ProfileAndCumul" // both profile and cumul implemented 
+	string CondObj_fillId = "onlyProfile" // both profile and cumul implemented 
 	                                         // possibilities "onlyProfile", "onlyCumul", "ProfileAndCumul"
 	string CondObj_name     = "noise" 
-	bool GainRenormalisation = true 
+	bool GainRenormalisation = false 
         
 	
 	string Profile_description = "Profile_NoiseFromCondDB"

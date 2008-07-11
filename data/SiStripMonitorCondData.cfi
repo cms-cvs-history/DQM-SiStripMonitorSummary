@@ -40,6 +40,9 @@ module CondDataMonitoring = SiStripMonitorCondData {
 
 	string CondObj_fillId = "onlyProfile" 
 	string CondObj_name   = "pedestal"  
+        bool FillSummaryAtLayerLevel=false
+        bool FillSummaryProfileAtLayerLevel=false
+        bool FillCumulativeSummaryAtLayerLevel=true
 
 
 	string Profile_description = "Profile_PedestalFromCondDB"
@@ -71,7 +74,10 @@ module CondDataMonitoring = SiStripMonitorCondData {
 	                                         // possibilities "onlyProfile", "onlyCumul", "ProfileAndCumul"
 	string CondObj_name     = "noise" 
 	bool GainRenormalisation = false 
-        
+        bool FillSummaryAtLayerLevel=false
+        bool FillSummaryProfileAtLayerLevel=false
+        bool FillCumulativeSummaryAtLayerLevel=true
+
 	
 	string Profile_description = "Profile_NoiseFromCondDB"
         string Profile_xTitle      = "Strip Number"
@@ -97,6 +103,12 @@ module CondDataMonitoring = SiStripMonitorCondData {
 	int32  Summary_NchY        = 50
 	double Summary_LowY        = 0
 	double Summary_HighY       = 5
+	string SummaryOfCumul_description   = "CumulativeSummary_NoiseFromCondDB"
+        string SummaryOfCumul_xTitle        = "Noise from CondDB"
+        string SummaryOfCumul_yTitle        = " "
+	int32  SummaryOfCumul_NchX          = 50
+	double SummaryOfCumul_LowX          = 0.0
+	double SummaryOfCumul_HighX         = 10.0	
 	
       }
 
@@ -107,7 +119,10 @@ module CondDataMonitoring = SiStripMonitorCondData {
 	string CondObj_fillId   = "onlyProfile"
         string CondObj_name     = "quality"  
 
-                                     
+         bool FillSummaryAtLayerLevel=false
+        bool FillSummaryProfileAtLayerLevel=false
+        bool FillCumulativeSummaryAtLayerLevel=true
+                                   
 	string Profile_description = "Profile_QualityFlagFromCondDB"
         string Profile_xTitle      = "Strip Number"
         string Profile_yTitle      = "Quality Flag from CondDB"
@@ -129,7 +144,10 @@ module CondDataMonitoring = SiStripMonitorCondData {
 	string CondObj_fillId   = "ProfileAndCumul" // possibilities "ProfileAndCumul" "onlyProfile", "onlyCumul"
         string CondObj_name     = "apvgain"  
 	          
-        
+        bool FillSummaryAtLayerLevel=false
+        bool FillSummaryProfileAtLayerLevel=false
+        bool FillCumulativeSummaryAtLayerLevel=true
+       
 	string Profile_description = "Profile_ApvGainFromCondDB"
         string Profile_xTitle      = "Apv Number" 
         string Profile_yTitle      = "ApvGain from CondDB"
@@ -163,7 +181,10 @@ module CondDataMonitoring = SiStripMonitorCondData {
         string CondObj_fillId   = "none" 
         string CondObj_name     = "lorentzangle"  
 	          
-        
+         bool FillSummaryAtLayerLevel=false
+        bool FillSummaryProfileAtLayerLevel=false
+        bool FillCumulativeSummaryAtLayerLevel=true
+      
 	string SummaryOfProfile_description = "Summary_LorentzAngleFromCondDB"
         string SummaryOfProfile_xTitle      = "detId" 
         string SummaryOfProfile_yTitle      = "LorentzAngle from CondDB"

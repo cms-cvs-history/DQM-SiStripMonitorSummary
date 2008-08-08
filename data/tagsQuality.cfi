@@ -1,0 +1,29 @@
+ es_source a = PoolDBESSource {
+	string appendToDataLabel = "test"
+	VPSet toGet = {	{ string record = "SiStripBadFiberRcd"   string tag = "SiStripBadChannel_v1"} }
+	string connect = "sqlite_file:dbfile.db"
+	string timetype = "runnumber"
+	untracked string BlobStreamerName="TBufferBlobStreamingService"
+     	PSet DBParameters ={
+	    untracked string authenticationPath="/afs/cern.ch/cms/DB/conddb"
+	}
+    }
+
+    
+ 
+
+  
+    include "CalibTracker/SiStripESProducers/data/SiStripQualityESProducer.cfi"
+    replace siStripQualityESProducer.ListOfRecordToMerge = {
+#       { string record = "SiStripDetCablingRcd" string tag = "" },
+#       { string record = "SiStripBadChannelRcd" string tag = "" },
+       { string record = "SiStripBadFiberRcd"   string tag = "test"}
+    }
+    replace siStripQualityESProducer.ReduceGranularity = true
+    replace siStripQualityESProducer.ThresholdForReducedGranularity  =  0.2     
+    
+  es_prefer siStripQualityESProducer = SiStripQualityESProducer{}
+
+ 
+
+

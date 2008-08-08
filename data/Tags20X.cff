@@ -1,26 +1,16 @@
 es_source siStripCond = poolDBESSource from "CalibTracker/Configuration/data/Common/PoolDBESSource.cfi"
 replace siStripCond.toGet = {
-                    { string record = "SiStripFedCablingRcd" string tag = "SiStripFedCabling_TKCC_20X_v3_hlt" },
-                    { string record = "SiStripNoisesRcd" string tag = "SiStripNoise_TKCC_20X_v3_hlt" },
-                    { string record = "SiStripPedestalsRcd" string tag = "SiStripPedestals_TKCC_20X_v3_hlt" }
-}
+    { string record = "SiStripFedCablingRcd" string tag = "SiStripFedCabling_TKCC_20X_v3_hlt" },
+#    { string record = "SiStripBadChannelRcd" string tag = "SiStripBadChannel_TKCC_20X_v3_hlt" },
+    { string record = "SiStripNoisesRcd" string tag = "SiStripNoise_TKCC_20X_v3_hlt" },
+    { string record = "SiStripPedestalsRcd" string tag = "SiStripPedestals_TKCC_20X_v3_hlt" }
+} 
 replace siStripCond.connect="frontier://Frontier/CMS_COND_20X_STRIP"
 replace siStripCond.DBParameters.authenticationPath=""
 es_module sistripconn = SiStripConnectivity {}
 
 
-
-
-
-
-
-
-
-
-
-
-
-
+include "DQM/SiStripMonitorSummary/data/tagsQuality.cfi"
 
 
 

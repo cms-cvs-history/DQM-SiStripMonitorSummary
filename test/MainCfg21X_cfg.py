@@ -12,9 +12,9 @@ process.load("DQM.SiStripMonitorSummary.Tags21X_cff")
 process.load("DQM.SiStripMonitorSummary.SiStripMonitorCondData_cfi")
 
 process.source = cms.Source("EmptyIOVSource",
-    lastRun = cms.untracked.uint32(36213),
+    lastRun = cms.untracked.uint32(51031),
     timetype = cms.string('runnumber'),
-    firstRun = cms.untracked.uint32(36213),
+    firstRun = cms.untracked.uint32(51031),
     #      untracked uint32 firstRun = 8055
     #      untracked uint32 lastRun  = 8055
     interval = cms.uint32(1)
@@ -43,17 +43,20 @@ process.DQMStore = cms.Service("DQMStore",
     verbose = cms.untracked.int32(1)
 )
 
-process.p = cms.Path(process.CondDataMonitoring*process.qTester)
+process.p = cms.Path(process.CondDataMonitoring)
 process.CondDataMonitoring.OutputMEsInRootFile = True
 process.CondDataMonitoring.MonitorSiStripPedestal = True
 process.CondDataMonitoring.MonitorSiStripNoise = True
-process.CondDataMonitoring.MonitorSiStripQuality = False
+process.CondDataMonitoring.MonitorSiStripLowThreshold = True
+process.CondDataMonitoring.MonitorSiStripHighThreshold = True
+process.CondDataMonitoring.MonitorSiStripQuality = True
+process.CondDataMonitoring.MonitorSiStripCabling = True
 process.CondDataMonitoring.MonitorSiStripApvGain = False
 process.CondDataMonitoring.MonitorSiStripLorentzAngle = False
 process.CondDataMonitoring.FillConditions_PSet.Mod_On = True
 process.CondDataMonitoring.FillConditions_PSet.SummaryOnLayerLevel_On = True
 process.CondDataMonitoring.FillConditions_PSet.SummaryOnStringLevel_On = False
-process.CondDataMonitoring.FillConditions_PSet.StripQualityLabel = 'test1'
+process.CondDataMonitoring.FillConditions_PSet.StripQualityLabel = ''
 process.CondDataMonitoring.FillConditions_PSet.restrictModules = False
 process.CondDataMonitoring.FillConditions_PSet.ModulesToBeIncluded = []
 process.CondDataMonitoring.FillConditions_PSet.ModulesToBeExcluded = []

@@ -11,16 +11,20 @@
 
     
  
+es_module siStripQualityESProducer = SiStripQualityESProducer {
+
+    string appendToDataLabel = ""
+    
+    VPSet ListOfRecordToMerge = {
+	{ string record = "SiStripBadFiberRcd"   string tag = "test"} 
+    }    	
+
+   untracked bool ReduceGranularity = true
+   untracked double ThresholdForReducedGranularity  =  0.2  
+	
+}
 
   
-    include "CalibTracker/SiStripESProducers/data/SiStripQualityESProducer.cfi"
-    replace siStripQualityESProducer.ListOfRecordToMerge = {
-#       { string record = "SiStripDetCablingRcd" string tag = "" },
-#       { string record = "SiStripBadChannelRcd" string tag = "" },
-       { string record = "SiStripBadFiberRcd"   string tag = "test"}
-    }
-    replace siStripQualityESProducer.ReduceGranularity = true
-    replace siStripQualityESProducer.ThresholdForReducedGranularity  =  0.2     
     
   es_prefer siStripQualityESProducer = SiStripQualityESProducer{}
 

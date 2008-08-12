@@ -7,6 +7,8 @@ module CondDataMonitoring = SiStripMonitorCondData {
       
       bool MonitorSiStripPedestal       = true
       bool MonitorSiStripNoise          = true
+      bool MonitorSiStripLowThreshold   = true
+      bool MonitorSiStripHighThreshold  = true
       bool MonitorSiStripQuality        = true
       bool MonitorSiStripApvGain        = false 
       bool MonitorSiStripLorentzAngle   = false 
@@ -162,6 +164,74 @@ module CondDataMonitoring = SiStripMonitorCondData {
 
 
         }
+
+      PSet SiStripLowThresholdDQM_PSet = { 
+
+        string WhichThreshold="Low" //this has to be either Low or High
+
+	string CondObj_fillId = "onlyProfile" 
+	string CondObj_name   = "lowthreshold"  
+
+        bool FillSummaryAtLayerLevel=true
+        bool FillSummaryProfileAtLayerLevel=true
+
+
+	string Profile_description = "Profile_LowThresholdFromCondDB"
+        string Profile_xTitle      = "Strip Number"
+        string Profile_yTitle      = "Low Threshold from CondDB(ADC)"
+	
+	string SummaryOfProfile_description = "ProfileSummary_LowThresholdFromCondDB"
+        string SummaryOfProfile_xTitle      = "Strip Number"
+        string SummaryOfProfile_yTitle      = "Low Threshold from CondDB(ADC)"	
+	int32  SummaryOfProfile_NchY        = 100
+	double SummaryOfProfile_LowY        = 0
+	double SummaryOfProfile_HighY       = 10
+
+	
+	
+        string Summary_description   = "Summary_LowThresholdFromCondDB"
+        string Summary_xTitle        = "detId"
+        string Summary_yTitle        = "Low Threshold from CondDB(ADC)"
+	int32  Summary_NchY          = 100
+	double Summary_LowY          = 0
+	double Summary_HighY         = 10
+
+      }
+
+
+      // -----
+      PSet SiStripHighThresholdDQM_PSet = { 
+
+        string WhichThreshold="High"
+
+	string CondObj_fillId = "onlyProfile" 
+	string CondObj_name   = "highthreshold"  
+
+        bool FillSummaryAtLayerLevel=true
+        bool FillSummaryProfileAtLayerLevel=true
+
+
+	string Profile_description = "Profile_HighThresholdFromCondDB"
+        string Profile_xTitle      = "Strip Number"
+        string Profile_yTitle      = "High Threshold from CondDB(ADC)"
+	
+	string SummaryOfProfile_description = "ProfileSummary_HighThresholdFromCondDB"
+        string SummaryOfProfile_xTitle      = "Strip Number"
+        string SummaryOfProfile_yTitle      = "High Threshold from CondDB(ADC)"	
+	int32  SummaryOfProfile_NchY        = 100
+	double SummaryOfProfile_LowY        = 0
+	double SummaryOfProfile_HighY       = 10
+
+	
+	
+        string Summary_description   = "Summary_HighThresholdFromCondDB"
+        string Summary_xTitle        = "detId"
+        string Summary_yTitle        = "High Threshold from CondDB(ADC)"
+	int32  Summary_NchY          = 100
+	double Summary_LowY          = 0
+	double Summary_HighY         = 10
+
+      }
 
 
       // -----

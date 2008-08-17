@@ -9,7 +9,7 @@ process.load("DQM.SiStripMonitorSummary.Tags20X_cff")
 #-------------------------------------------------
 # DQM
 #-------------------------------------------------
-process.load("DQM.SiStripMonitorSummary.SiStripMonitorCondData_cfi")
+process.load("DQM.SiStripMonitorSummary.SiStripMonitorCondDataOffline_cfi")
 
 process.source = cms.Source("PoolSource",
     fileNames = cms.untracked.vstring('/store/data/CRUZET3/Cosmics/RAW/v1/000/051/193/780E0842-A74E-DD11-AC94-001617C3B64C.root')
@@ -39,5 +39,4 @@ process.DQMStore = cms.Service("DQMStore",
 )
 
 process.p = cms.Path(process.CondDataMonitoring*process.qTester)
-process.CondDataMonitoring.OutputMEsInRootFile = True
 

@@ -9,7 +9,7 @@ process.load("DQM.SiStripMonitorSummary.Tags21X_cff")
 #-------------------------------------------------
 # DQM
 #-------------------------------------------------
-process.load("DQM.SiStripMonitorSummary.SiStripMonitorCondData_cfi")
+process.load("DQM.SiStripMonitorSummary.SiStripMonitorCondDataOffline_cfi")
 
 process.source = cms.Source("EmptyIOVSource",
     lastRun = cms.untracked.uint32(51031),
@@ -44,15 +44,6 @@ process.DQMStore = cms.Service("DQMStore",
 )
 
 process.p = cms.Path(process.CondDataMonitoring)
-process.CondDataMonitoring.OutputMEsInRootFile = True
-process.CondDataMonitoring.MonitorSiStripPedestal = False
-process.CondDataMonitoring.MonitorSiStripNoise = True
-process.CondDataMonitoring.MonitorSiStripLowThreshold = False
-process.CondDataMonitoring.MonitorSiStripHighThreshold = False
-process.CondDataMonitoring.MonitorSiStripQuality = True
-process.CondDataMonitoring.MonitorSiStripCabling = True
-process.CondDataMonitoring.MonitorSiStripApvGain = False
-process.CondDataMonitoring.MonitorSiStripLorentzAngle = False
 process.CondDataMonitoring.FillConditions_PSet.Mod_On = False
 process.CondDataMonitoring.FillConditions_PSet.SummaryOnLayerLevel_On = True
 process.CondDataMonitoring.FillConditions_PSet.SummaryOnStringLevel_On = False

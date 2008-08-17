@@ -15,7 +15,7 @@ process.load("Configuration.StandardSequences.FrontierConditions_GlobalTag_cff")
 #-------------------------------------------------
 # DQM
 #-------------------------------------------------
-process.load("DQM.SiStripMonitorSummary.SiStripMonitorCondData_cfi")
+process.load("DQM.SiStripMonitorSummary.SiStripMonitorCondDataOffline_cfi")
 
 process.source = cms.Source("EmptyIOVSource",
     lastRun = cms.untracked.uint32(8055),
@@ -43,12 +43,8 @@ process.DQMStore = cms.Service("DQMStore",
 
 process.p = cms.Path(process.CondDataMonitoring)
 process.GlobalTag.globaltag = 'STARTUP_V2::All'
-process.CondDataMonitoring.OutputMEsInRootFile = True
-process.CondDataMonitoring.MonitorSiStripPedestal = False
-process.CondDataMonitoring.MonitorSiStripNoise = False
 process.CondDataMonitoring.MonitorSiStripQuality = False
 process.CondDataMonitoring.MonitorSiStripApvGain = True
-process.CondDataMonitoring.MonitorSiStripLorentzAngle = False
 process.CondDataMonitoring.FillConditions_PSet.Mod_On = True
 process.CondDataMonitoring.FillConditions_PSet.SummaryOnLayerLevel_On = True
 process.CondDataMonitoring.FillConditions_PSet.SummaryOnStringLevel_On = False

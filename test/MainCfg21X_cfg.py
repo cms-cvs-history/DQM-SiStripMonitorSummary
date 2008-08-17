@@ -44,15 +44,3 @@ process.DQMStore = cms.Service("DQMStore",
 )
 
 process.p = cms.Path(process.CondDataMonitoring)
-process.CondDataMonitoring.FillConditions_PSet.Mod_On = False
-process.CondDataMonitoring.FillConditions_PSet.SummaryOnLayerLevel_On = True
-process.CondDataMonitoring.FillConditions_PSet.SummaryOnStringLevel_On = False
-process.CondDataMonitoring.FillConditions_PSet.StripQualityLabel = ''
-process.CondDataMonitoring.FillConditions_PSet.restrictModules = False
-process.CondDataMonitoring.FillConditions_PSet.ModulesToBeIncluded = []
-process.CondDataMonitoring.FillConditions_PSet.ModulesToBeExcluded = []
-process.CondDataMonitoring.FillConditions_PSet.SubDetectorsToBeExcluded = ['none']
-process.CondDataMonitoring.FillConditions_PSet.ModulesToBeFilled = 'all'
-process.CondDataMonitoring.SiStripNoisesDQM_PSet.CondObj_fillId = 'onlyCumul'
-process.CondDataMonitoring.SiStripNoisesDQM_PSet.GainRenormalisation = False
-

@@ -45,15 +45,15 @@ process.DQMStore = cms.Service("DQMStore",
 
 process.p = cms.Path(process.CondDataMonitoring)
 process.CondDataMonitoring.OutputMEsInRootFile = True
-process.CondDataMonitoring.MonitorSiStripPedestal = True
+process.CondDataMonitoring.MonitorSiStripPedestal = False
 process.CondDataMonitoring.MonitorSiStripNoise = True
-process.CondDataMonitoring.MonitorSiStripLowThreshold = True
-process.CondDataMonitoring.MonitorSiStripHighThreshold = True
+process.CondDataMonitoring.MonitorSiStripLowThreshold = False
+process.CondDataMonitoring.MonitorSiStripHighThreshold = False
 process.CondDataMonitoring.MonitorSiStripQuality = True
 process.CondDataMonitoring.MonitorSiStripCabling = True
 process.CondDataMonitoring.MonitorSiStripApvGain = False
 process.CondDataMonitoring.MonitorSiStripLorentzAngle = False
-process.CondDataMonitoring.FillConditions_PSet.Mod_On = True
+process.CondDataMonitoring.FillConditions_PSet.Mod_On = False
 process.CondDataMonitoring.FillConditions_PSet.SummaryOnLayerLevel_On = True
 process.CondDataMonitoring.FillConditions_PSet.SummaryOnStringLevel_On = False
 process.CondDataMonitoring.FillConditions_PSet.StripQualityLabel = ''
@@ -62,6 +62,6 @@ process.CondDataMonitoring.FillConditions_PSet.ModulesToBeIncluded = []
 process.CondDataMonitoring.FillConditions_PSet.ModulesToBeExcluded = []
 process.CondDataMonitoring.FillConditions_PSet.SubDetectorsToBeExcluded = ['none']
 process.CondDataMonitoring.FillConditions_PSet.ModulesToBeFilled = 'all'
-process.CondDataMonitoring.SiStripNoisesDQM_PSet.CondObj_fillId = 'ProfileAndCumul'
+process.CondDataMonitoring.SiStripNoisesDQM_PSet.CondObj_fillId = 'onlyCumul'
 process.CondDataMonitoring.SiStripNoisesDQM_PSet.GainRenormalisation = False
 

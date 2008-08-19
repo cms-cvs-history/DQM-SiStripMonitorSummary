@@ -104,14 +104,14 @@ module CondDataMonitoring = SiStripMonitorCondData {
         string SummaryOfProfile_yTitle      = "Noise from CondDB(ADC)"	
 	int32  SummaryOfProfile_NchY        = 50
 	double SummaryOfProfile_LowY        = 0
-	double SummaryOfProfile_HighY       = 5
+	double SummaryOfProfile_HighY       = 10
 	
 	string Summary_description = "Summary_NoiseFromCondDB"
         string Summary_xTitle      = "detId"
         string Summary_yTitle      = "Noise from CondDB(ADC)"
 	int32  Summary_NchY        = 50
 	double Summary_LowY        = 0
-	double Summary_HighY       = 5
+	double Summary_HighY       = 10
 	string SummaryOfCumul_description   = "CumulativeSummary_NoiseFromCondDB"
         string SummaryOfCumul_xTitle        = "Noise from CondDB"
         string SummaryOfCumul_yTitle        = " "

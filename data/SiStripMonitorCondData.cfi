@@ -3,21 +3,21 @@ module CondDataMonitoring = SiStripMonitorCondData {
 	
       string OutputFileName="SiStripMonitorCondData.root"
       
-      bool OutputMEsInRootFile          = false
+      bool OutputMEsInRootFile          = true
       
-      bool MonitorSiStripPedestal       = false
+      bool MonitorSiStripPedestal       = true
       bool MonitorSiStripNoise          = true
-      bool MonitorSiStripLowThreshold   = false
-      bool MonitorSiStripHighThreshold  = false
-      bool MonitorSiStripQuality        = false
+      bool MonitorSiStripLowThreshold   = true
+      bool MonitorSiStripHighThreshold  = true
+      bool MonitorSiStripQuality        = true
       bool MonitorSiStripApvGain        = false 
       bool MonitorSiStripLorentzAngle   = false 
-      bool MonitorSiStripCabling        = true 
+      bool MonitorSiStripCabling        = true
       
       
       PSet FillConditions_PSet = {
         string FolderName_For_QualityAndCabling_SummaryHistos="SiStrip/Tracks"
-	bool Mod_On   = false
+	bool Mod_On   = true
  	bool SummaryOnLayerLevel_On = true
  	bool SummaryOnStringLevel_On = false
 	bool GrandSummary_On = true
@@ -79,7 +79,7 @@ module CondDataMonitoring = SiStripMonitorCondData {
       // -----
       PSet SiStripNoisesDQM_PSet = {  
  	
-	string CondObj_fillId = "onlyCumul" // both profile and cumul implemented 
+	string CondObj_fillId = "ProfileAndCumul" // both profile and cumul implemented 
 	                                         // possibilities "onlyProfile", "onlyCumul", "ProfileAndCumul"
 	string CondObj_name     = "noise" 
 	bool GainRenormalisation = false 
@@ -104,14 +104,14 @@ module CondDataMonitoring = SiStripMonitorCondData {
         string SummaryOfProfile_yTitle      = "Noise from CondDB(ADC)"	
 	int32  SummaryOfProfile_NchY        = 50
 	double SummaryOfProfile_LowY        = 0
-	double SummaryOfProfile_HighY       = 10
+	double SummaryOfProfile_HighY       = 5
 	
 	string Summary_description = "Summary_NoiseFromCondDB"
         string Summary_xTitle      = "detId"
         string Summary_yTitle      = "Noise from CondDB(ADC)"
 	int32  Summary_NchY        = 50
 	double Summary_LowY        = 0
-	double Summary_HighY       = 10
+	double Summary_HighY       = 5
 	string SummaryOfCumul_description   = "CumulativeSummary_NoiseFromCondDB"
         string SummaryOfCumul_xTitle        = "Noise from CondDB"
         string SummaryOfCumul_yTitle        = " "

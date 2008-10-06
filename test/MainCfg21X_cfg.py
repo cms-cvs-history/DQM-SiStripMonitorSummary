@@ -12,12 +12,12 @@ process.load("DQM.SiStripMonitorSummary.Tags21X_cff")
 process.load("DQM.SiStripMonitorSummary.SiStripMonitorCondDataOffline_cfi")
 
 process.source = cms.Source("EmptyIOVSource",
-    lastRun = cms.untracked.uint32(51031),
+    lastValue = cms.uint64(51031),
     timetype = cms.string('runnumber'),
-    firstRun = cms.untracked.uint32(51031),
+    firstValue = cms.uint64(51031),
     #      untracked uint32 firstRun = 8055
     #      untracked uint32 lastRun  = 8055
-    interval = cms.uint32(1)
+    interval = cms.uint64(1)
 )
 
 process.maxEvents = cms.untracked.PSet(

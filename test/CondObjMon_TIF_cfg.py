@@ -18,10 +18,10 @@ process.load("Configuration.StandardSequences.FrontierConditions_GlobalTag_cff")
 process.load("DQM.SiStripMonitorSummary.SiStripMonitorCondDataOffline_cfi")
 
 process.source = cms.Source("EmptyIOVSource",
-    lastRun = cms.untracked.uint32(8055),
+    lastValue = cms.uint64(8055),
     timetype = cms.string('runnumber'),
-    firstRun = cms.untracked.uint32(8055),
-    interval = cms.uint32(1)
+    firstValue = cms.uint64(8055),
+    interval = cms.uint64(1)
 )
 
 process.maxEvents = cms.untracked.PSet(

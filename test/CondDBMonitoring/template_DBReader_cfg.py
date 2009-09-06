@@ -4,13 +4,10 @@ process = cms.Process("Reader")
 
 process.MessageLogger = cms.Service("MessageLogger",
     debugModules = cms.untracked.vstring(''),
-    Reader = cms.untracked.PSet(
+    insertLog = cms.untracked.PSet(
         threshold = cms.untracked.string('INFO')
     ),
-    cout = cms.untracked.PSet(
-        threshold = cms.untracked.string('INFO')
-    ),
-    destinations = cms.untracked.vstring('cout') #Reader.log
+    destinations = cms.untracked.vstring('insertLog') #Reader, cout
 )
 
 process.maxEvents = cms.untracked.PSet(
@@ -57,7 +54,7 @@ process.CondDataMonitoring.MonitorSiStripHighThreshold = insertThresholdMon
 process.CondDataMonitoring.OutputMEsInRootFile         = True
 process.CondDataMonitoring.FillConditions_PSet.OutputSummaryAtLayerLevelAsImage           = True
 process.CondDataMonitoring.FillConditions_PSet.OutputSummaryProfileAtLayerLevelAsImage    = insertLorentzAngleMon # This should be saved only in case of LA (because for LA no SummaryAtLayerLevel is available)
-process.CondDataMonitoring.FillConditions_PSet.OutputCumulativeSummaryAtLayerLevelAsImage = False
+process.CondDataMonitoring.FillConditions_PSet.OutputCumulativeSummaryAtLayerLevelAsImage = insertMonitorCumulative
 process.CondDataMonitoring.FillConditions_PSet.HistoMaps_On     = False
 process.CondDataMonitoring.FillConditions_PSet.TkMap_On         = True # This is just for test until TkMap is included in all classes!!! Uncomment!!!!
 process.CondDataMonitoring.FillConditions_PSet.ActiveDetIds_On  = insertActiveDetId # This should be set to False only for Lorentz Angle
@@ -68,6 +65,15 @@ process.CondDataMonitoring.SiStripQualityDQM_PSet.FillSummaryAtLayerLevel       
 process.CondDataMonitoring.SiStripApvGainsDQM_PSet.FillSummaryAtLayerLevel      = True
 process.CondDataMonitoring.SiStripLowThresholdDQM_PSet.FillSummaryAtLayerLevel  = True
 process.CondDataMonitoring.SiStripHighThresholdDQM_PSet.FillSummaryAtLayerLevel = True
+
+process.CondDataMonitoring.SiStripCablingDQM_PSet.CondObj_fillId       = 'ProfileAndCumul'
+process.CondDataMonitoring.SiStripPedestalsDQM_PSet.CondObj_fillId     = 'onlyProfile'
+process.CondDataMonitoring.SiStripNoisesDQM_PSet.CondObj_fillId        = 'onlyCumul'
+process.CondDataMonitoring.SiStripQualityDQM_PSet.CondObj_fillId       = 'onlyProfile'
+process.CondDataMonitoring.SiStripApvGainsDQM_PSet.CondObj_fillId      = 'ProfileAndCumul'
+process.CondDataMonitoring.SiStripLorentzAngleDQM_PSet.CondObj_fillId  = 'ProfileAndCumul'
+process.CondDataMonitoring.SiStripLowThresholdDQM_PSet.CondObj_fillId  = 'onlyProfile'
+process.CondDataMonitoring.SiStripHighThresholdDQM_PSet.CondObj_fillId = 'onlyProfile'
 
 ## --- TkMap specific Configurable options:
 
@@ -83,8 +89,8 @@ process.CondDataMonitoring.SiStripPedestalsDQM_PSet.maxValue     = 400.
 
 process.CondDataMonitoring.SiStripNoisesDQM_PSet.TkMap_On     = True
 process.CondDataMonitoring.SiStripNoisesDQM_PSet.TkMapName    = 'NoiseTkMap.png'
-process.CondDataMonitoring.SiStripNoisesDQM_PSet.minValue     = 0.
-process.CondDataMonitoring.SiStripNoisesDQM_PSet.maxValue     = 6.
+process.CondDataMonitoring.SiStripNoisesDQM_PSet.minValue     = 3.
+process.CondDataMonitoring.SiStripNoisesDQM_PSet.maxValue     = 9.
 
 process.CondDataMonitoring.SiStripApvGainsDQM_PSet.TkMap_On     = True
 process.CondDataMonitoring.SiStripApvGainsDQM_PSet.TkMapName    = 'GainTkMap.png'

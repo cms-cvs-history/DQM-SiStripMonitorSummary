@@ -1,8 +1,5 @@
 #!/bin/bash
 
-#export PATH=$PATH:/afs/cern.ch/cms/sw/common/
-#export FRONTIER_FORCERELOAD=long # This should not be used anymore!!!
-
 date
 
 if [ $# -ne 4 ]; then
@@ -25,7 +22,34 @@ GLOBALTAGDIR=GlobalTags
 STORAGEPATH=/afs/cern.ch/cms/tracker/sistrcalib/WWW/CondDBMonitoring
 WORKDIR=$PWD
 
-#eval `scramv1 runtime -sh`
+#Function to publish png pictures on the web. Will be used at the end of the script:
+CreateIndex ()
+{
+    cp /afs/cern.ch/cms/tracker/sistrcalib/WWW/index_new.html .
+
+    COUNTER=0
+    LASTUPDATE=`date`
+
+    for Plot in `ls *.png`; do
+	if [[ $COUNTER%2 -eq 0 ]]; then
+	    cat >> index_new.html  << EOF
+<TR> <TD align=center> <a href="$Plot"><img src="$Plot"hspace=5 vspace=5 border=0 style="width: 90%" ALT="$Plot"></a> 
+  <br> $Plot </TD>
+EOF
+	else
+	    cat >> index_new.html  << EOF
+  <TD align=center> <a href="$Plot"><img src="$Plot"hspace=5 vspace=5 border=0 style="width: 90%" ALT="$Plot"></a> 
+  <br> $Plot </TD> </TR> 
+EOF
+	fi
+
+	let COUNTER++
+    done
+
+    cat /afs/cern.ch/cms/tracker/sistrcalib/WWW/template_index_foot.html | sed -e "s@insertDate@$LASTUPDATE@g" >> index_new.html
+
+    mv -f index_new.html index.html
+}
 
 # Creation of all needed directories if not existing yet
 if [ ! -d "$STORAGEPATH/$DB" ]; then 
@@ -52,7 +76,7 @@ echo "Creating directory $STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR"
 mkdir $STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR; 
 
 # Access of all SiStrip Tags uploaded to the given DB account
-#cmscond_list_iov -c oracle://$DB/$ACCOUNT -P /afs/cern.ch/cms/DB/conddb > $DBTAGCOLLECTION # Access via oracle
+#cmscond_list_iov -c oracle://$DB/$ACCOUNT -P /afs/cern.ch/cms/DB/conddb | grep SiStrip > $DBTAGCOLLECTION # Access via oracle
 cmscond_list_iov -c frontier://$FRONTIER/$ACCOUNT -P /afs/cern.ch/cms/DB/conddb | grep SiStrip > $DBTAGCOLLECTION # Access via Frontier
 
 # Loop on all DB Tags
@@ -62,6 +86,7 @@ for tag in `cat $DBTAGCOLLECTION`; do
 
     NEWTAG=False
     NEWIOV=False
+    CFGISSAVED=False
 
     # Discover which kind of tag is processed
     MONITOR_NOISE=False
@@ -71,13 +96,18 @@ for tag in `cat $DBTAGCOLLECTION`; do
     MONITOR_CABLING=False
     MONITOR_LA=False
     MONITOR_THRESHOLD=False
-    MONITOR_VOLTAGE=False
+
+    LOGDESTINATION=cout
+
+    MONITORCUMULATIVE=False
+    CREATETRENDS=False
 
     if      [ `echo $tag | grep "Noise" | wc -w` -gt 0 ]; then
 	MONITOR_NOISE=True
 	USEACTIVEDETID=True
 	RECORD=SiStripNoisesRcd
 	TAGSUBDIR=SiStripNoise
+	MONITORCUMULATIVE=True
     else if [ `echo $tag | grep "Pedestal" | wc -w` -gt 0 ]; then
 	MONITOR_PEDESTAL=True
 	USEACTIVEDETID=True
@@ -93,11 +123,16 @@ for tag in `cat $DBTAGCOLLECTION`; do
 	USEACTIVEDETID=True
 	RECORD=SiStripBadChannelRcd
 	TAGSUBDIR=SiStripBadChannel
+	LOGDESTINATION=Reader
+	CREATETRENDS=True
     else if [ `echo $tag | grep "Cabling" | wc -w` -gt 0 ]; then
 	MONITOR_CABLING=True
 	USEACTIVEDETID=True
 	RECORD=SiStripFedCablingRcd
+	RECORDFORQUALITY=SiStripDetCablingRcd
 	TAGSUBDIR=SiStripFedCabling
+	LOGDESTINATION=Reader
+	CREATETRENDS=True
     else if [ `echo $tag | grep "Lorentz" | wc -w` -gt 0 ]; then
 	MONITOR_LA=True
 	USEACTIVEDETID=False
@@ -109,10 +144,12 @@ for tag in `cat $DBTAGCOLLECTION`; do
 	RECORD=SiStripThresholdRcd
 	TAGSUBDIR=SiStripThreshold
     else if [ `echo $tag | grep "VOff" | wc -w` -gt 0 ]; then
-	MONITOR_VOLTAGE=True
+	MONITOR_QUALITY=True
 	USEACTIVEDETID=True
 	RECORD=SiStripDetVOffRcd
 	TAGSUBDIR=SiStripVoltage
+	LOGDESTINATION=Reader
+	CREATETRENDS=True
     else
 	USEACTIVEDETID=False
 	RECORD=Unknown
@@ -156,7 +193,7 @@ for tag in `cat $DBTAGCOLLECTION`; do
     fi
 
     if [ `echo $DB | grep "prep" | wc -w` -gt 0 ]; then
-	for globaltag in `cmscond_tagintrees -c sqlite_file:$WORKDIR/CMSSW_3_1_0_pre6/src/CondCore/TagCollection/data/GlobalTag.db -P /afs/cern.ch/cms/DB/conddb -t $tag | grep Trees`; do # Access via Frontier
+	for globaltag in `cmscond_tagintrees -c sqlite_file:$WORKDIR/CMSSW_3_2_5/src/CondCore/TagCollection/data/GlobalTag.db -P /afs/cern.ch/cms/DB/conddb -t $tag | grep Trees`; do # Access via Frontier
 
 	    if [ "$globaltag" != "#" ] && [ "$globaltag" != "Trees" ]; then
 		echo $globaltag >> globaltag_tmp.txt;
@@ -219,6 +256,11 @@ EOF
 
     fi
 
+    if [ "$RECORD" = "Unknown" ]; then
+	echo "Unknown strip tag. Processing skipped!"
+	continue
+    fi
+
     # Get the list of IoVs for the given DB-Tag
     #cmscond_list_iov -c oracle://$DB/$ACCOUNT -P /afs/cern.ch/cms/DB/conddb -t $tag | awk '{if(NR>4) print "Run_In "$1 " Run_End " $2}' > list_Iov.txt  # Access via oracle
     cmscond_list_iov -c frontier://$FRONTIER/$ACCOUNT -P /afs/cern.ch/cms/DB/conddb -t $tag | awk '{if(NR>4) print "Run_In "$1 " Run_End " $2}' > list_Iov.txt # Access via Frontier
@@ -228,61 +270,99 @@ EOF
     
     if [ ! -d "$STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/rootfiles" ]; then
 	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/rootfiles;
+	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/cfg;
 	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots;
 	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB/Layer1;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB/Layer2;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB/Layer3;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB/Layer4;
 	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Layer1;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Layer2;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Layer3;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Layer4;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Layer5;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Layer6;
 	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side1;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side1/Disk1;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side1/Disk2;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side1/Disk3;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side2;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side2/Disk1;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side2/Disk2;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side2/Disk3;
 	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side1;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side1/Disk1;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side1/Disk2;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side1/Disk3;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side1/Disk4;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side1/Disk5;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side1/Disk6;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side1/Disk7;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side1/Disk8;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side1/Disk9;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side2;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side2/Disk1;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side2/Disk2;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side2/Disk3;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side2/Disk4;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side2/Disk5;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side2/Disk6;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side2/Disk7;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side2/Disk8;
-	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side2/Disk9;
+
+	for i in {1..4}; do
+	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB/Layer$i;
+
+	    if [ "$MONITORCUMULATIVE" = "True" ] || [ "$CREATETRENDS" = "True" ]; then
+		mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB/Layer$i/Profile;
+	    fi
+	    if [ "$MONITORCUMULATIVE" = "True" ]; then
+		mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB/Layer$i/Cumulative;
+	    fi
+	    if [ "$CREATETRENDS" = "True" ]; then
+		mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB/Layer$i/Trends;
+	    fi
+	done
+
+	for i in {1..6}; do
+	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Layer$i;
+
+	    if [ "$MONITORCUMULATIVE" = "True" ] || [ "$CREATETRENDS" = "True" ]; then
+		mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Layer$i/Profile;
+	    fi
+	    if [ "$MONITORCUMULATIVE" = "True" ]; then
+		mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Layer$i/Cumulative;
+	    fi
+	    if [ "$CREATETRENDS" = "True" ]; then
+		mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Layer$i/Trends;
+	    fi
+	done
+
+	for i in {1..2}; do
+	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side$i;
+	    for j in {1..3}; do
+		mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side$i/Disk$j;
+
+		if [ "$MONITORCUMULATIVE" = "True" ] || [ "$CREATETRENDS" = "True" ]; then
+		    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side$i/Disk$j/Profile;
+		fi
+		if [ "$MONITORCUMULATIVE" = "True" ]; then
+		    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side$i/Disk$j/Cumulative;
+		fi
+		if [ "$CREATETRENDS" = "True" ]; then
+		    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side$i/Disk$j/Trends;
+		fi
+	    done
+	done
+
+	for i in {1..2}; do
+	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side$i;
+	    for j in {1..9}; do
+		mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side$i/Disk$j;
+
+		if [ "$MONITORCUMULATIVE" = "True" ] || [ "$CREATETRENDS" = "True" ]; then
+		    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side$i/Disk$j/Profile;
+		fi
+		if [ "$MONITORCUMULATIVE" = "True" ]; then
+		    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side$i/Disk$j/Cumulative;
+		fi
+		if [ "$CREATETRENDS" = "True" ]; then
+		    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side$i/Disk$j/Trends;
+		fi
+	    done
+	done
+
+	if [ "$MONITOR_QUALITY" = "True" ] || [ "$MONITOR_CABLING" = "True" ]; then
+	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/Trends
+	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB/Trends;
+	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Trends;
+	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side1/Trends;
+	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side2/Trends;
+	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side1/Trends;
+	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side2/Trends;
+	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/Summary
+	fi
+
+
 	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TrackerMap;
 
-	if [ "$MONITOR_QUALITY" = "True" ] || [ "$MONITOR_VOLTAGE" = "True" ]; then
-	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/Summary
+	if [ "$MONITOR_QUALITY" = "True" ]; then
 	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/Summary/BadAPVs
 	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/Summary/BadFibers
 	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/Summary/BadModules
 	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/Summary/BadStrips
+	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/QualityLog
 	fi
 
 	if [ "$MONITOR_CABLING" = "True" ]; then
-	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/Summary
+	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/CablingLog
 	fi
 
     fi
@@ -308,30 +388,77 @@ EOF
 
 	NEWIOV=True
 
-	if [ "$RECORD" = "Unknown" ]; then
-	    echo "Unknown strip tag. Processing skipped!"
-	    continue
-	fi
-
-	cat template_DBReader_cfg.py | sed -e "s@insertRun@$IOV_number@g" -e "s@insertDB@$DB@g" -e "s@insertFrontier@$FRONTIER@g" -e "s@insertAccount@$ACCOUNT@g" -e "s@insertTag@$tag@g" -e "s@insertRecord@$RECORD@g" -e "s@insertOutFile@$ROOTFILE@g" -e "s@insertPedestalMon@$MONITOR_PEDESTAL@g" -e "s@insertNoiseMon@$MONITOR_NOISE@g" -e "s@insertQualityMon@$MONITOR_QUALITY@g" -e "s@insertGainMon@$MONITOR_GAIN@g" -e "s@insertCablingMon@$MONITOR_CABLING@g" -e "s@insertLorentzAngleMon@$MONITOR_LA@g" -e "s@insertThresholdMon@$MONITOR_THRESHOLD@g" -e "s@insertActiveDetId@$USEACTIVEDETID@g"> DBReader_cfg.py
-	if [ "$MONITOR_QUALITY" = "True" ] || [ "$MONITOR_VOLTAGE" = "True" ]; then
+	cat template_DBReader_cfg.py | sed -e "s@insertRun@$IOV_number@g" -e "s@insertLog@$LOGDESTINATION@g" -e "s@insertDB@$DB@g" -e "s@insertFrontier@$FRONTIER@g" -e "s@insertAccount@$ACCOUNT@g" -e "s@insertTag@$tag@g" -e "s@insertRecord@$RECORD@g" -e "s@insertOutFile@$ROOTFILE@g" -e "s@insertPedestalMon@$MONITOR_PEDESTAL@g" -e "s@insertNoiseMon@$MONITOR_NOISE@g" -e "s@insertQualityMon@$MONITOR_QUALITY@g" -e "s@insertGainMon@$MONITOR_GAIN@g" -e "s@insertCablingMon@$MONITOR_CABLING@g" -e "s@insertLorentzAngleMon@$MONITOR_LA@g" -e "s@insertThresholdMon@$MONITOR_THRESHOLD@g" -e "s@insertMonitorCumulative@$MONITORCUMULATIVE@g" -e "s@insertActiveDetId@$USEACTIVEDETID@g"> DBReader_cfg.py
+	if [ "$MONITOR_QUALITY" = "True" ]; then
 	    cat >> DBReader_cfg.py  << EOF
 
 process.SiStripQualityESProducer = cms.ESProducer("SiStripQualityESProducer",
    ReduceGranularity = cms.bool(False),
+   PrintDebugOutput = cms.bool(False),
+   UseEmptyRunInfo = cms.bool(False),
    ListOfRecordToMerge = cms.VPSet(cms.PSet(
    record = cms.string('$RECORD'),
    tag = cms.string('')
    ))
 )
+
+process.stat = cms.EDFilter("SiStripQualityStatistics",
+    TkMapFileName = cms.untracked.string(''),
+    dataLabel = cms.untracked.string('')
+)
+
+process.e = cms.EndPath(process.stat)
 EOF
 	fi
 
 	if [ "$MONITOR_CABLING" = "True" ]; then
+	    if [ "$ACCOUNT" = "CMS_COND_21X_STRIP" ]; then # For CMSSW_2_x_y the FedCablingReader is not available!
 	    cat >> DBReader_cfg.py  << EOF
 
+process.SiStripQualityESProducer = cms.ESProducer("SiStripQualityESProducer",
+   ReduceGranularity = cms.bool(False),
+   PrintDebugOutput = cms.bool(False),
+   UseEmptyRunInfo = cms.bool(False),
+   ListOfRecordToMerge = cms.VPSet(cms.PSet(
+   record = cms.string('$RECORDFORQUALITY'),
+   tag = cms.string('')
+   ))
+)
+
 process.sistripconn = cms.ESProducer("SiStripConnectivity")
+
+process.stat = cms.EDFilter("SiStripQualityStatistics",
+    TkMapFileName = cms.untracked.string(''),
+    dataLabel = cms.untracked.string('')
+)
+
+process.e = cms.EndPath(process.stat)
 EOF
+	    else
+	    cat >> DBReader_cfg.py  << EOF
+
+process.SiStripQualityESProducer = cms.ESProducer("SiStripQualityESProducer",
+   ReduceGranularity = cms.bool(False),
+   PrintDebugOutput = cms.bool(False),
+   UseEmptyRunInfo = cms.bool(False),
+   ListOfRecordToMerge = cms.VPSet(cms.PSet(
+   record = cms.string('$RECORDFORQUALITY'),
+   tag = cms.string('')
+   ))
+)
+
+process.sistripconn = cms.ESProducer("SiStripConnectivity")
+
+process.stat = cms.EDFilter("SiStripQualityStatistics",
+    TkMapFileName = cms.untracked.string(''),
+    dataLabel = cms.untracked.string('')
+)
+
+process.reader = cms.EDFilter("SiStripFedCablingReader")
+
+process.e = cms.EndPath(process.stat*process.reader)
+EOF
+	    fi
 	fi
 
 	echo "Executing cmsRun. Stay tuned ..."
@@ -340,32 +467,88 @@ EOF
 
 	echo "cmsRun finished. Now moving the files to the corresponding directories ..."
 
+	if [ "$NEWTAG" = "True" ] && [ "$CFGISSAVED" = "False" ]; then
+	    cp DBReader_cfg.py $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/cfg/${tag}_cfg.py
+	    CFGISSAVED=True
+	fi
+
 	mv $ROOTFILE $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/rootfiles;
+
+	if [ "$MONITOR_QUALITY" = "True" ]; then
+	    cat $LOGDESTINATION.log | awk 'BEGIN{doprint=0}{if(match($0,"New IOV")!=0) doprint=1;if(match($0,"%MSG")!=0) {doprint=0;} if(doprint==1) print $0}' > QualityInfo_Run${IOV_number}.txt
+	    mv QualityInfo_Run${IOV_number}.txt $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/QualityLog/
+
+	    rm $LOGDESTINATION.log
+	fi
+
+	if [ "$MONITOR_CABLING" = "True" ]; then
+	    if [ "$ACCOUNT" != "CMS_COND_21X_STRIP" ]; then
+		cat $LOGDESTINATION.log | awk 'BEGIN{doprint=0}{if(match($0,"beginRun")!=0) doprint=1;if(match($0,"%MSG")!=0) {doprint=0;} if(doprint==1) print $0}' > CablingInfo_Run${IOV_number}.txt
+		mv CablingInfo_Run${IOV_number}.txt $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/CablingLog/
+	    fi
+
+	    cat $LOGDESTINATION.log | awk 'BEGIN{doprint=0}{if(match($0,"New IOV")!=0) doprint=1;if(match($0,"%MSG")!=0) {doprint=0;} if(doprint==1) print $0}' > QualityInfoFromCabling_Run${IOV_number}.txt
+	    mv QualityInfoFromCabling_Run${IOV_number}.txt $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/CablingLog/
+
+	    rm $LOGDESTINATION.log
+	fi
 
 	for Plot in `ls *.png | grep TIB`; do
 	    PNGNAME=`echo ${Plot#*_*_*_*_*_} | gawk -F . '{print $1}'`
 	    LAYER=`echo ${PNGNAME#*_*_} | gawk -F _ '{print $1}'`
-	    mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB/Layer$LAYER/${PNGNAME}__Run${IOV_number}.png;
+	    if [ "$MONITORCUMULATIVE" = "True" ] || [ "$CREATETRENDS" = "True" ]; then
+		if [ `echo $Plot | grep Cumulative` ]; then
+		    mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB/Layer$LAYER/Cumulative/${PNGNAME}__Run${IOV_number}.png;
+		else
+		    mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB/Layer$LAYER/Profile/${PNGNAME}__Run${IOV_number}.png;
+		fi
+	    else
+		mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB/Layer$LAYER/${PNGNAME}__Run${IOV_number}.png;
+	    fi
 	done;
 
 	for Plot in `ls *.png | grep TOB`; do
 	    PNGNAME=`echo ${Plot#*_*_*_*_*_} | gawk -F . '{print $1}'`
 	    LAYER=`echo ${PNGNAME#*_*_} | gawk -F _ '{print $1}'`
-	    mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Layer$LAYER/${PNGNAME}__Run${IOV_number}.png;
+	    if [ "$MONITORCUMULATIVE" = "True" ] || [ "$CREATETRENDS" = "True" ]; then
+		if [ `echo $Plot | grep Cumulative` ]; then
+		    mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Layer$LAYER/Cumulative/${PNGNAME}__Run${IOV_number}.png;
+		else
+		    mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Layer$LAYER/Profile/${PNGNAME}__Run${IOV_number}.png;
+		fi
+	    else
+		mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Layer$LAYER/${PNGNAME}__Run${IOV_number}.png;
+	    fi
 	done;
 
 	for Plot in `ls *.png | grep TID`; do
 	    PNGNAME=`echo ${Plot#*_*_*_*_*_} | gawk -F . '{print $1}'`
 	    SIDE=`echo ${PNGNAME#*_*_} | gawk -F _ '{print $1}'`
 	    DISK=`echo ${PNGNAME#*_*_*_*_*_*_} | gawk -F _ '{print $1}'`
-	    mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side$SIDE/Disk$DISK/${PNGNAME}__Run${IOV_number}.png;
+	    if [ "$MONITORCUMULATIVE" = "True" ] || [ "$CREATETRENDS" = "True" ]; then
+		if [ `echo $Plot | grep Cumulative` ]; then
+		    mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side$SIDE/Disk$DISK/Cumulative/${PNGNAME}__Run${IOV_number}.png;
+		else
+		    mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side$SIDE/Disk$DISK/Profile/${PNGNAME}__Run${IOV_number}.png;
+		fi
+	    else
+		mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side$SIDE/Disk$DISK/${PNGNAME}__Run${IOV_number}.png;
+	    fi
 	done;
 
 	for Plot in `ls *.png | grep TEC`; do
 	    PNGNAME=`echo ${Plot#*_*_*_*_*_} | gawk -F . '{print $1}'`
 	    SIDE=`echo ${PNGNAME#*_*_} | gawk -F _ '{print $1}'`
 	    DISK=`echo ${PNGNAME#*_*_*_*_*_*_} | gawk -F _ '{print $1}'`
-	    mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side$SIDE/Disk$DISK/${PNGNAME}__Run${IOV_number}.png;
+	    if [ "$MONITORCUMULATIVE" = "True" ] || [ "$CREATETRENDS" = "True" ]; then
+		if [ `echo $Plot | grep Cumulative` ]; then
+		    mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side$SIDE/Disk$DISK/Cumulative/${PNGNAME}__Run${IOV_number}.png;
+		else
+		    mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side$SIDE/Disk$DISK/Profile/${PNGNAME}__Run${IOV_number}.png;
+		fi
+	    else
+		mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side$SIDE/Disk$DISK/${PNGNAME}__Run${IOV_number}.png;
+	    fi
 	done;
 
 	for Plot in `ls *.png | grep TkMap`; do
@@ -398,109 +581,237 @@ EOF
 
     done;
 
-    # Publish the histograms on a web page
+    # Run the Trends and Publish all histograms on a web page
     if [ "$NEWTAG" = "True" ] || [ "$NEWIOV" = "True" ]; then
+
+	if [ "$CREATETRENDS" = "True" ]; then
+	    echo "Creating the Trend Plots ..."
+
+	    ./getOfflineDQMData.sh $DB $ACCOUNT $TAGSUBDIR $tag
+
+	    for i in {1..4}; do
+		for Plot in `ls *.png | grep TIBLayer$i`; do
+		    mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB/Layer$i/Trends;
+		done
+	    done
+
+	    for i in {1..6}; do
+		for Plot in `ls *.png | grep TOBLayer$i`; do
+		    mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Layer$i/Trends;
+		done
+	    done
+
+	    for i in {1..3}; do
+		for Plot in `ls *.png | grep TID-Disk$i`; do
+		    mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side1/Disk$i/Trends;
+		done
+		for Plot in `ls *.png | grep TID+Disk$i`; do
+		    mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side2/Disk$i/Trends;
+		done
+	    done
+
+	    for i in {1..9}; do
+		for Plot in `ls *.png | grep TEC-Disk$i`; do
+		    mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side1/Disk$i/Trends;
+		done
+		for Plot in `ls *.png | grep TEC+Disk$i`; do
+		    mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side2/Disk$i/Trends;
+		done
+	    done
+	    
+	    for Plot in `ls *.png | grep TIB`; do
+		mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB/Trends;
+	    done
+
+	    for Plot in `ls *.png | grep TOB`; do
+		mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Trends;
+	    done
+
+	    for Plot in `ls *.png | grep TID-`; do
+		mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side1/Trends;
+	    done
+
+	    for Plot in `ls *.png | grep TID+`; do
+		mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side2/Trends;
+	    done
+
+	    for Plot in `ls *.png | grep TEC-`; do
+		mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side1/Trends;
+	    done
+
+	    for Plot in `ls *.png | grep TEC+`; do
+		mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side2/Trends;
+	    done
+
+	    for Plot in `ls *.png | grep Tracker`; do
+		mv $Plot $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/Trends;
+	    done
+	fi
+
+	mv TrackerSummary.root $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/rootfiles;
+	rm -f TrackerPlots.root;
+	rm -f makePlots_cc.d makePlots_cc.so;
+	rm -f makeTKTrend_cc.d makeTKTrend_cc.so;
 
 	echo "Publishing the new tag $tag (or the new IOV) on the web ..."
 
 	for i in {1..4}; do
 	    cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-	    cat template_createWPageForDBMonitoring.pl | sed -e "s@insertPageName@$tag --- TIB Layer $i --- Summary Report@g" > createWPageForDBMonitoring.pl
-	    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB/Layer$i;
-	    if [ `ls *.png | grep small | wc -w` -gt 0 ]; then
-		rm -f `ls *.png | grep small`
+	    cat template_index_header.html | sed -e "s@insertPageName@$tag --- TIB Layer $i --- Summary Report@g" > index_new.html
+	    if [ "$MONITORCUMULATIVE" = "True" ] || [ "$CREATETRENDS" = "True" ]; then
+		cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB/Layer$i/Profile;
+		CreateIndex
+
+		if [ "$MONITORCUMULATIVE" = "True" ]; then
+		    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB/Layer$i/Cumulative;
+		    CreateIndex
+		fi
+
+		if [ "$CREATETRENDS" = "True" ]; then
+		    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB/Layer$i/Trends;
+		    CreateIndex
+		fi
+	    else
+		cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB/Layer$i;
+		CreateIndex
 	    fi
-	    perl /afs/cern.ch/cms/tracker/sistrcalib/WWW/createWPageForDBMonitoring.pl
 	done
 
 	for i in {1..6}; do
 	    cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-	    cat template_createWPageForDBMonitoring.pl | sed -e "s@insertPageName@$tag --- TOB Layer $i --- Summary Report@g" > createWPageForDBMonitoring.pl
-	    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Layer$i;
-	    if [ `ls *.png | grep small | wc -w` -gt 0 ]; then
-		rm -f `ls *.png | grep small`
+	    cat template_index_header.html | sed -e "s@insertPageName@$tag --- TOB Layer $i --- Summary Report@g" > index_new.html
+	    if [ "$MONITORCUMULATIVE" = "True" ] || [ "$CREATETRENDS" = "True" ]; then
+		cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Layer$i/Profile;
+		CreateIndex
+
+		if [ "$MONITORCUMULATIVE" = "True" ]; then
+		    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Layer$i/Cumulative;
+		    CreateIndex
+		fi
+
+		if [ "$CREATETRENDS" = "True" ]; then
+		    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Layer$i/Trends;
+		    CreateIndex
+		fi
+	    else
+		cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Layer$i;
+		CreateIndex
 	    fi
-	    perl /afs/cern.ch/cms/tracker/sistrcalib/WWW/createWPageForDBMonitoring.pl
 	done
 
 	for i in {1..2}; do
 	    for j in {1..3}; do
 		cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-		cat template_createWPageForDBMonitoring.pl | sed -e "s@insertPageName@$tag --- TID Side $i Disk $j --- Summary Report@g" > createWPageForDBMonitoring.pl
-		cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side$i/Disk$j;
-		if [ `ls *.png | grep small | wc -w` -gt 0 ]; then
-		    rm -f `ls *.png | grep small`
+		cat template_index_header.html | sed -e "s@insertPageName@$tag --- TID Side $i Disk $j --- Summary Report@g" > index_new.html
+		if [ "$MONITORCUMULATIVE" = "True" ] || [ "$CREATETRENDS" = "True" ]; then
+		    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side$i/Disk$j/Profile;
+		    CreateIndex
+
+		    if [ "$MONITORCUMULATIVE" = "True" ]; then
+			cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side$i/Disk$j/Cumulative;
+			CreateIndex
+		    fi
+
+		    if [ "$CREATETRENDS" = "True" ]; then
+			cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side$i/Disk$j/Trends;
+			CreateIndex
+		    fi
+		else
+		    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side$i/Disk$j;
+		    CreateIndex
 		fi
-		perl /afs/cern.ch/cms/tracker/sistrcalib/WWW/createWPageForDBMonitoring.pl
 	    done
 	done
 
 	for i in {1..2}; do
 	    for j in {1..9}; do
 		cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-		cat template_createWPageForDBMonitoring.pl | sed -e "s@insertPageName@$tag --- TEC Side $i Disk $j --- Summary Report@g" > createWPageForDBMonitoring.pl
-		cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side$i/Disk$j;
-		if [ `ls *.png | grep small | wc -w` -gt 0 ]; then
-		    rm -f `ls *.png | grep small`
+		cat template_index_header.html | sed -e "s@insertPageName@$tag --- TEC Side $i Disk $j --- Summary Report@g" > index_new.html
+		if [ "$MONITORCUMULATIVE" = "True" ] || [ "$CREATETRENDS" = "True" ]; then
+		    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side$i/Disk$j/Profile;
+		    CreateIndex
+
+		    if [ "$MONITORCUMULATIVE" = "True" ]; then
+			cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side$i/Disk$j/Cumulative;
+			CreateIndex
+		    fi
+
+		    if [ "$CREATETRENDS" = "True" ]; then
+			cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side$i/Disk$j/Trends;
+			CreateIndex
+		    fi
+		else
+		    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side$i/Disk$j;
+		    CreateIndex
 		fi
-		perl /afs/cern.ch/cms/tracker/sistrcalib/WWW/createWPageForDBMonitoring.pl
 	    done
 	done
 
-	if [ "$MONITOR_QUALITY" = "True" ] || [ "$MONITOR_VOLTAGE" = "True" ]; then
+	if [ "$CREATETRENDS" = "True" ]; then
 	    cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-	    cat template_createWPageForDBMonitoring.pl | sed -e "s@insertPageName@$tag --- Bad APVs --- Summary Report@g" > createWPageForDBMonitoring.pl
-	    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/Summary/BadAPVs;
-	    if [ `ls *.png | grep small | wc -w` -gt 0 ]; then
-		rm -f `ls *.png | grep small`
-	    fi
-	    perl /afs/cern.ch/cms/tracker/sistrcalib/WWW/createWPageForDBMonitoring.pl
+	    cat template_index_header.html | sed -e "s@insertPageName@$tag --- Full Strip Tracker --- Trend Plots@g" > index_new.html
+	    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/Trends;
+	    CreateIndex
 
 	    cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-	    cat template_createWPageForDBMonitoring.pl | sed -e "s@insertPageName@$tag --- Bad Fibers --- Summary Report@g" > createWPageForDBMonitoring.pl
+	    cat template_index_header.html | sed -e "s@insertPageName@$tag --- TIB --- Trend Plots@g" > index_new.html
+	    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB/Trends;
+	    CreateIndex
+
+	    cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
+	    cat template_index_header.html | sed -e "s@insertPageName@$tag --- TOB --- Trend Plots@g" > index_new.html
+	    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Trends;
+	    CreateIndex
+
+	    for i in {1..2}; do
+		cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
+		cat template_index_header.html | sed -e "s@insertPageName@$tag --- TID Side $i --- Trend Plots@g" > index_new.html
+		cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side$i/Trends;
+		CreateIndex
+
+		cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
+		cat template_index_header.html | sed -e "s@insertPageName@$tag --- TEC Side $i --- Trend Plots@g" > index_new.html
+		cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side$i/Trends;
+		CreateIndex
+	    done
+	fi
+
+	if [ "$MONITOR_QUALITY" = "True" ]; then
+	    cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
+	    cat template_index_header.html | sed -e "s@insertPageName@$tag --- Bad APVs --- Summary Report@g" > index_new.html
+	    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/Summary/BadAPVs;
+	    CreateIndex
+
+	    cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
+	    cat template_index_header.html | sed -e "s@insertPageName@$tag --- Bad Fibers --- Summary Report@g" > index_new.html
 	    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/Summary/BadFibers;
-	    if [ `ls *.png | grep small | wc -w` -gt 0 ]; then
-		rm -f `ls *.png | grep small`
-	    fi
-	    perl /afs/cern.ch/cms/tracker/sistrcalib/WWW/createWPageForDBMonitoring.pl
+	    CreateIndex
 	    
 	    cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-	    cat template_createWPageForDBMonitoring.pl | sed -e "s@insertPageName@$tag --- Bad Modules --- Summary Report@g" > createWPageForDBMonitoring.pl
+	    cat template_index_header.html | sed -e "s@insertPageName@$tag --- Bad Modules --- Summary Report@g" > index_new.html
 	    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/Summary/BadModules;
-	    if [ `ls *.png | grep small | wc -w` -gt 0 ]; then
-		rm -f `ls *.png | grep small`
-	    fi
-	    perl /afs/cern.ch/cms/tracker/sistrcalib/WWW/createWPageForDBMonitoring.pl
+	    CreateIndex
 
 	    cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-	    cat template_createWPageForDBMonitoring.pl | sed -e "s@insertPageName@$tag --- Bad Strips --- Summary Report@g" > createWPageForDBMonitoring.pl
+	    cat template_index_header.html | sed -e "s@insertPageName@$tag --- Bad Strips --- Summary Report@g" > index_new.html
 	    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/Summary/BadStrips;
-	    if [ `ls *.png | grep small | wc -w` -gt 0 ]; then
-		rm -f `ls *.png | grep small`
-	    fi
-	    perl /afs/cern.ch/cms/tracker/sistrcalib/WWW/createWPageForDBMonitoring.pl
+	    CreateIndex
 		
 	fi
     
 	if [ "$MONITOR_CABLING" = "True" ]; then
 	    cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-	    cat template_createWPageForDBMonitoring.pl | sed -e "s@insertPageName@$tag --- Summary Report@g" > createWPageForDBMonitoring.pl
+	    cat template_index_header.html | sed -e "s@insertPageName@$tag --- Summary Report@g" > index_new.html
 	    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/Summary/;
-	    if [ `ls *.png | grep small | wc -w` -gt 0 ]; then
-		rm -f `ls *.png | grep small`
-	    fi
-	    perl /afs/cern.ch/cms/tracker/sistrcalib/WWW/createWPageForDBMonitoring.pl
+	    CreateIndex
 		
 	fi
 
 	if [ -d "$STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TrackerMap" ]; then
 	    cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-	    cat template_createWPageForDBMonitoring.pl | sed -e "s@insertPageName@$tag --- Tracker Maps for all IOVs ---@g" > createWPageForDBMonitoring.pl
+	    cat template_index_header.html | sed -e "s@insertPageName@$tag --- Tracker Maps for all IOVs ---@g" > index_new.html
 	    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TrackerMap;
-	    if [ `ls *.png | grep small | wc -w` -gt 0 ]; then
-		rm -f `ls *.png | grep small`
-	    fi
-	    perl /afs/cern.ch/cms/tracker/sistrcalib/WWW/createWPageForDBMonitoring.pl
+	    CreateIndex
 
 	fi
 

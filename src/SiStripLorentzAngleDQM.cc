@@ -185,7 +185,7 @@ void SiStripLorentzAngleDQM::fillMEsForLayer( std::map<uint32_t, ModMEs> selMEsM
 	// Fill the Histo_TkMap+TkMap with the LA:
         if(HistoMaps_On_ ) Tk_HM_->fill(sameLayerDetIds_[i], lorentzangleHandle_->getLorentzAngle(sameLayerDetIds_[i]));
 
-	  cout<<sameLayerDetIds_[i]<<"\t"<<lorentzangleHandle_->getLorentzAngle(sameLayerDetIds_[i])<<endl;
+	  std::cout<<sameLayerDetIds_[i]<<"\t"<<lorentzangleHandle_->getLorentzAngle(sameLayerDetIds_[i])<<std::endl;
 
 	if(fPSet_.getParameter<bool>("TkMap_On") || hPSet_.getParameter<bool>("TkMap_On")){
 	  fillTkMap(sameLayerDetIds_[i], lorentzangleHandle_->getLorentzAngle(sameLayerDetIds_[i]));

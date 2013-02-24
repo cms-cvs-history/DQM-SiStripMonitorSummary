@@ -2,19 +2,23 @@
 
 date
 
-if [ $# -ne 4 ]; then
-    echo "You have to provide a <DB>, an <Account>, a <GTAccount> and the <FrontierPath> !!!"
+if [ $# -ne 5 ]; then
+    afstokenchecker.sh "You have to provide a <tag_search_string>, a <DB>, an <Account>, a <GTAccount> and the <FrontierPath> !!!"
     exit
 fi
 
+afstokenchecker.sh "Starting execution of MonitorDB_NewDirStructure_KeepTagLinks $1 $2 $3 $4"
+
+#Example: SEARCHSTRING=SiStrip
+SEARCHSTRING=$1
 #Example: DB=cms_orcoff_prod
-DB=$1
+DB=$2
 #Example: ACCOUNT=CMS_COND_21X_STRIP
-ACCOUNT=$2
+ACCOUNT=$3
 #Example: GTACCOUNT=CMS_COND_21X_GLOBALTAG
-GTACCOUNT=$3
+GTACCOUNT=$4
 #Example: FRONTIER=FrontierProd
-FRONTIER=$4
+FRONTIER=$5
 DBTAGCOLLECTION=DBTagsIn_${DB}_${ACCOUNT}.txt
 GLOBALTAGCOLLECTION=GlobalTagsForDBTag.txt
 DBTAGDIR=DBTagCollection
@@ -53,36 +57,37 @@ EOF
 
 # Creation of all needed directories if not existing yet
 if [ ! -d "$STORAGEPATH/$DB" ]; then 
-    echo "Creating directory $STORAGEPATH/$DB"
+    afstokenchecker.sh "Creating directory $STORAGEPATH/$DB"
     mkdir $STORAGEPATH/$DB;
 fi
 
 if [ ! -d "$STORAGEPATH/$DB/$ACCOUNT" ]; then 
-    echo "Creating directory $STORAGEPATH/$DB/$ACCOUNT"
+    afstokenchecker.sh "Creating directory $STORAGEPATH/$DB/$ACCOUNT"
     mkdir $STORAGEPATH/$DB/$ACCOUNT; 
 fi
 
 if [ ! -d "$STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR" ]; then 
-    echo "Creating directory $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR"
+    afstokenchecker.sh "Creating directory $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR"
     mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR; 
 fi
 
 # Creation of Global Tag directory from scratch to have always up-to-date information (and no old links that are obsolete)
-if [ -d "$STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR" ]; then 
-    rm -rf $STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR; 
+#if [ -d "$STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR" ]; then 
+#    rm -rf $STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR; 
+#fi
+
+if [ ! -d "$STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR" ]; then 
+    afstokenchecker.sh "Creating directory $STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR"
+    mkdir $STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR; 
 fi
 
-echo "Creating directory $STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR"
-mkdir $STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR; 
-
 # Access of all SiStrip Tags uploaded to the given DB account
-#cmscond_list_iov -c oracle://$DB/$ACCOUNT -P /afs/cern.ch/cms/DB/conddb | grep SiStrip > $DBTAGCOLLECTION # Access via oracle
-cmscond_list_iov -c frontier://$FRONTIER/$ACCOUNT -P /afs/cern.ch/cms/DB/conddb | grep SiStrip > $DBTAGCOLLECTION # Access via Frontier
+cmscond_list_iov -c frontier://cmsfrontier.cern.ch:8000/$FRONTIER/$ACCOUNT -P /afs/cern.ch/cms/DB/conddb -a | grep $SEARCHSTRING | awk '{if(match($0,"_10")!=0) {} else {print $0}}' > $DBTAGCOLLECTION # Access via Frontier
 
 # Loop on all DB Tags
 for tag in `cat $DBTAGCOLLECTION`; do
 
-    echo "Processing DB-Tag $tag";
+    afstokenchecker.sh "Processing DB-Tag $tag";
 
     NEWTAG=False
     NEWIOV=False
@@ -96,10 +101,16 @@ for tag in `cat $DBTAGCOLLECTION`; do
     MONITOR_CABLING=False
     MONITOR_LA=False
     MONITOR_THRESHOLD=False
+    MONITOR_LATENCY=False
+    MONITOR_SHIFTANDCROSSTALK=False
+    MONITOR_ALCARECOTRIGGERBITS=False
 
     LOGDESTINATION=cout
 
+    RECORDFORQUALITY=Dummy
+
     MONITORCUMULATIVE=False
+    USEACTIVEDETID=False
     CREATETRENDS=False
 
     if      [ `echo $tag | grep "Noise" | wc -w` -gt 0 ]; then
@@ -150,6 +161,20 @@ for tag in `cat $DBTAGCOLLECTION`; do
 	TAGSUBDIR=SiStripVoltage
 	LOGDESTINATION=Reader
 	CREATETRENDS=True
+    else if [ `echo $tag | grep "Latency" | wc -w` -gt 0 ]; then
+	MONITOR_LATENCY=True
+	RECORD=SiStripLatencyRcd
+	TAGSUBDIR=SiStripLatency
+	LOGDESTINATION=Reader
+    else if [ `echo $tag | grep "Shift" | wc -w` -gt 0 ]; then
+	MONITOR_SHIFTANDCROSSTALK=True
+	RECORD=SiStripConfObjectRcd
+	TAGSUBDIR=SiStripShiftAndCrosstalk
+	LOGDESTINATION=Reader
+    else if [ `echo $tag | grep "AlCaRecoTriggerBits" | wc -w` -gt 0 ]; then
+	MONITOR_ALCARECOTRIGGERBITS=True
+	RECORD=AlCaRecoTriggerBitsRcd
+	TAGSUBDIR=SiStripDQM
     else
 	USEACTIVEDETID=False
 	RECORD=Unknown
@@ -163,25 +188,30 @@ for tag in `cat $DBTAGCOLLECTION`; do
     fi
     fi
     fi
+    fi
+    fi
+    fi
 
     # Creation of DB-Tag directory if not existing yet
     if [ ! -d "$STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR" ]; then 
-	echo "Creating directory $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR"
+	afstokenchecker.sh "Creating directory $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR"
 	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR; 
     fi
 
     if [ ! -d "$STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag" ]; then 
-	echo "Creating directory $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag"
+	afstokenchecker.sh "Creating directory $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag"
 	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag;
 
 	NEWTAG=True
     fi
 
-    if [ -d "$STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/RelatedGlobalTags" ]; then
-	rm -rf $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/RelatedGlobalTags; # remove former links to be safe if something has changed there
-    fi
+#    if [ -d "$STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/RelatedGlobalTags" ]; then
+#	rm -rf $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/RelatedGlobalTags; # remove former links to be safe if something has changed there
+#    fi
 
-    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/RelatedGlobalTags; # start from scratch to have always the up-to-date information
+    if [ ! -d "$STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/RelatedGlobalTags" ]; then
+	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/RelatedGlobalTags;
+    fi
 
     # Access of all Global Tags for the given DB Tag
     if [ -f globaltag_tmp.txt ]; then
@@ -192,63 +222,59 @@ for tag in `cat $DBTAGCOLLECTION`; do
 	rm $GLOBALTAGCOLLECTION;
     fi
 
-    if [ `echo $DB | grep "prep" | wc -w` -gt 0 ]; then
-	for globaltag in `cmscond_tagintrees -c sqlite_file:$WORKDIR/CMSSW_3_2_5/src/CondCore/TagCollection/data/GlobalTag.db -P /afs/cern.ch/cms/DB/conddb -t $tag | grep Trees`; do # Access via Frontier
+    for globaltag in `cmscond_tagintrees -c frontier://cmsfrontier.cern.ch:8000/$FRONTIER/$GTACCOUNT -P /afs/cern.ch/cms/DB/conddb -t $tag | grep Trees`; do # Access via Frontier
 
-	    if [ "$globaltag" != "#" ] && [ "$globaltag" != "Trees" ]; then
-		echo $globaltag >> globaltag_tmp.txt;
-		cat globaltag_tmp.txt | sed -e "s@\[@@g" -e "s@\]@@g" -e "s@'@@g" -e "s@,@@g" > $GLOBALTAGCOLLECTION
-	    fi
-
-	done;
-
-    else
-	for globaltag in `cmscond_tagintrees -c frontier://cmsfrontier.cern.ch:8000/$FRONTIER/$GTACCOUNT -P /afs/cern.ch/cms/DB/conddb -t $tag | grep Trees`; do # Access via Frontier
-
-	    if [ "$globaltag" != "#" ] && [ "$globaltag" != "Trees" ]; then
-		echo $globaltag >> globaltag_tmp.txt;
-		cat globaltag_tmp.txt | sed -e "s@\[@@g" -e "s@\]@@g" -e "s@'@@g" -e "s@,@@g" > $GLOBALTAGCOLLECTION
-	    fi
-
-	done;
-    fi
-
+	if [ "$globaltag" != "#" ] && [ "$globaltag" != "Trees" ]; then
+	    echo $globaltag >> globaltag_tmp.txt;
+	    cat globaltag_tmp.txt | sed -e "s@\[@@g" -e "s@\]@@g" -e "s@'@@g" -e "s@,@@g" > $GLOBALTAGCOLLECTION
+	fi
+	
+    done;
+    
     # Loop on all Global Tags
     if [ -f $GLOBALTAGCOLLECTION ]; then
 	for globaltag in `cat $GLOBALTAGCOLLECTION`; do
 
-	    echo "Processing Global Tag $globaltag"
+	    afstokenchecker.sh "Processing Global Tag $globaltag"
 
 	# Creation of Global Tag directory if not existing yet
 	    if [ ! -d "$STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR/$globaltag" ]; then 
-		echo "Creating directory $STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR/$globaltag"
+		afstokenchecker.sh "Creating directory $STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR/$globaltag"
 		mkdir $STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR/$globaltag;
 	    fi
 
 	# Creation of links between the DB-Tag and the respective Global Tags
 	    cd $STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR/$globaltag;
-	    if [ -f $tag ]; then
-		rm $tag;
-	    fi
-	    cat >> $tag << EOF
+	    if [ ! -f $tag ]; then
+
+		echo Getting record and object names...
+		RECORDANDOBJECTNAME=`cmscond_tagtree_list -c frontier://cmsfrontier.cern.ch:8000/$FRONTIER/$GTACCOUNT -P /afs/cern.ch/cms/DB/conddb -T $globaltag | grep $tag | awk '{printf "%s, %s",$4,$5}' | sed -e "s@record:@Record Name: @g" -e "s@object:@Object Name: @g"`
+		echo $RECORDANDOBJECTNAME 
+
+		cat >> $tag << EOF
 <html>
 <body>
 <a href="https://test-stripdbmonitor.web.cern.ch/test-stripdbmonitor/CondDBMonitoring/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag">https://test-stripdbmonitor.web.cern.ch/test-stripdbmonitor/CondDBMonitoring/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag</a>
+<br />
+$RECORDANDOBJECTNAME
 </body>
 </html>
 EOF
+	    fi
+
 	    #ln -s $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag $tag;
 	    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/RelatedGlobalTags;
-	    if [ -f $globaltag ]; then
-		rm $globaltag;
-	    fi
-	    cat >> $globaltag << EOF
+	    if [ ! -f $globaltag ]; then
+
+		cat >> $globaltag << EOF
 <html>
 <body>
 <a href="https://test-stripdbmonitor.web.cern.ch/test-stripdbmonitor/CondDBMonitoring/$DB/$ACCOUNT/$GLOBALTAGDIR/$globaltag">https://test-stripdbmonitor.web.cern.ch/test-stripdbmonitor/CondDBMonitoring/$DB/$ACCOUNT/$GLOBALTAGDIR/$globaltag</a>
 </body>
 </html>
 EOF
+	    fi
+
 	    #ln -s $STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR/$globaltag $globaltag;
 	    cd $WORKDIR;
 
@@ -257,19 +283,20 @@ EOF
     fi
 
     if [ "$RECORD" = "Unknown" ]; then
-	echo "Unknown strip tag. Processing skipped!"
+	afstokenchecker.sh "Unknown strip tag. Processing skipped!"
 	continue
     fi
 
     # Get the list of IoVs for the given DB-Tag
-    #cmscond_list_iov -c oracle://$DB/$ACCOUNT -P /afs/cern.ch/cms/DB/conddb -t $tag | awk '{if(NR>4) print "Run_In "$1 " Run_End " $2}' > list_Iov.txt  # Access via oracle
-    cmscond_list_iov -c frontier://$FRONTIER/$ACCOUNT -P /afs/cern.ch/cms/DB/conddb -t $tag | awk '{if(NR>4) print "Run_In "$1 " Run_End " $2}' > list_Iov.txt # Access via Frontier
+    afstokenchecker.sh "Getting the list of IOVs for the given DB tag..."
+    iov_list_tag.py -c frontier://cmsfrontier.cern.ch:8000/$FRONTIER/$ACCOUNT -P /afs/cern.ch/cms/DB/conddb -t $tag > list_Iov.txt # Access via Frontier
 
     # Access DB for the given DB-Tag and dump values in a root-file and histograms in .png if not existing yet
-    echo "Now the values are retrieved from the DB..."
+    afstokenchecker.sh "Now the values are retrieved from the DB..."
     
     if [ ! -d "$STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/rootfiles" ]; then
 	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/rootfiles;
+	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/Documentation;
 	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/cfg;
 	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots;
 	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB;
@@ -365,16 +392,67 @@ EOF
 	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/CablingLog
 	fi
 
+	if [ "$MONITOR_LATENCY" = "True" ]; then
+	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/LatencyLog
+	fi
+
+	if [ "$MONITOR_SHIFTANDCROSSTALK" = "True" ]; then
+	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/ShiftAndCrosstalkLog
+	fi
+
+	if [ "$MONITOR_ALCARECOTRIGGERBITS" = "True" ]; then
+	    mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/AlCaRecoTriggerBitsLog
+	fi
+
     fi
 
     if [ `ls *.png | wc -w` -gt 0 ]; then
 	rm *.png;
     fi
 
-    # Process each IOV of the given DB-Tag seperately
-    for IOV_number in `grep Run_In list_Iov.txt | awk '{print $2}'`; do
+#    if [ "$RECORD" = "SiStripDetVOffRcd" ] && [ "$NEWTAG" = "True" ]; then
+#	ROOTFILE="${tag}_Timestamp_XYZ.root"
+#	cat template_DBReader_cfg.py | sed -e "s@insertRun@insertTimestamp@g" -e "s@runnumber@timestamp@g" -e "s@insertLog@$LOGDESTINATION@g" -e "s@insertDB@$DB@g" -e "s@insertFrontier@$FRONTIER@g" -e "s@insertAccount@$ACCOUNT@g" -e "s@insertTag@$tag@g" -e "s@insertRecord@$RECORD@g" -e "s@insertOutFile@$ROOTFILE@g" -e "s@insertPedestalMon@$MONITOR_PEDESTAL@g" -e "s@insertNoiseMon@$MONITOR_NOISE@g" -e "s@insertQualityMon@$MONITOR_QUALITY@g" -e "s@insertGainMon@$MONITOR_GAIN@g" -e "s@insertCablingMon@$MONITOR_CABLING@g" -e "s@insertLorentzAngleMon@$MONITOR_LA@g" -e "s@insertThresholdMon@$MONITOR_THRESHOLD@g" -e "s@insertMonitorCumulative@$MONITORCUMULATIVE@g" -e "s@insertActiveDetId@$USEACTIVEDETID@g"> DBReader_cfg.py
+#	cat >> DBReader_cfg.py  << EOF
+#
+#process.SiStripQualityESProducer = cms.ESProducer("SiStripQualityESProducer",
+#   ReduceGranularity = cms.bool(False),
+#   PrintDebugOutput = cms.bool(False),
+#   UseEmptyRunInfo = cms.bool(False),
+#   ListOfRecordToMerge = cms.VPSet(cms.PSet(
+#   record = cms.string('$RECORD'),
+#   tag = cms.string('')
+#   ))
+#)
+#
+#process.stat = cms.EDAnalyzer("SiStripQualityStatistics",
+#    TkMapFileName = cms.untracked.string(''),
+#    dataLabel = cms.untracked.string('')
+#)
+#
+#process.e = cms.EndPath(process.stat)
+#EOF
+#
+#	cp DBReader_cfg.py $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/cfg/${tag}_cfg.py
+#
+#	cat >> ${tag}_documentation << EOF
+#<html>
+#<body>
+#<a href="https://twiki.cern.ch/twiki/bin/view/CMS/StripTrackerDBTagsForCalibrations#${tag}">https://twiki.cern.ch/twiki/bin/view/CMS/StripTrackerDBTagsForCalibrations#${tag}</a>
+#</body>
+#</html>
+#EOF
+#
+#	mv ${tag}_documentation $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/Documentation;
+#
+#	rm $LOGDESTINATION.log
+#	continue
+#    fi
 
-	if [ "$IOV_number" = "Total" ] || [ $IOV_number -gt 100000000 ]; then
+    # Process each IOV of the given DB-Tag seperately
+    for IOV_number in `cat list_Iov.txt`; do
+
+	if [ "$IOV_number" = "Total" ] || [ $IOV_number -gt 100000000 ]; then  # do not loop on time-based IOVs 
 	    continue
 	fi
 	
@@ -384,92 +462,48 @@ EOF
 	    continue
 	fi
 
-	echo "New IOV $IOV_number found. Being processed..."
+	if [ "$MONITOR_LATENCY" = "True" ] && [ -f $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/LatencyLog/LatencyInfo_Run${IOV_number}.txt ]; then # Skip IOVs already processed. Take only new ones.
+	    continue
+	fi
+
+	if [ "$MONITOR_SHIFTANDCROSSTALK" = "True" ] && [ -f $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/ShiftAndCrosstalkLog/ShiftAndCrosstalkInfo_Run${IOV_number}.txt ]; then # Skip IOVs already processed. Take only new ones.
+	    continue
+	fi
+
+	if [ "$MONITOR_ALCARECOTRIGGERBITS" = "True" ] && [ -f $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/AlCaRecoTriggerBitsLog/AlCaRecoTriggerBitsInfo_Run${IOV_number}.txt ]; then # Skip IOVs already processed. Take only new ones.
+	    continue
+	fi
+
+	afstokenchecker.sh "New IOV $IOV_number found. Being processed..."
 
 	NEWIOV=True
 
-	cat template_DBReader_cfg.py | sed -e "s@insertRun@$IOV_number@g" -e "s@insertLog@$LOGDESTINATION@g" -e "s@insertDB@$DB@g" -e "s@insertFrontier@$FRONTIER@g" -e "s@insertAccount@$ACCOUNT@g" -e "s@insertTag@$tag@g" -e "s@insertRecord@$RECORD@g" -e "s@insertOutFile@$ROOTFILE@g" -e "s@insertPedestalMon@$MONITOR_PEDESTAL@g" -e "s@insertNoiseMon@$MONITOR_NOISE@g" -e "s@insertQualityMon@$MONITOR_QUALITY@g" -e "s@insertGainMon@$MONITOR_GAIN@g" -e "s@insertCablingMon@$MONITOR_CABLING@g" -e "s@insertLorentzAngleMon@$MONITOR_LA@g" -e "s@insertThresholdMon@$MONITOR_THRESHOLD@g" -e "s@insertMonitorCumulative@$MONITORCUMULATIVE@g" -e "s@insertActiveDetId@$USEACTIVEDETID@g"> DBReader_cfg.py
-	if [ "$MONITOR_QUALITY" = "True" ]; then
-	    cat >> DBReader_cfg.py  << EOF
+	afstokenchecker.sh "Executing cmsRun. Stay tuned ..."
+	CMSRUNCOMMAND="cmsRun ${CMSSW_BASE}/src/DQM/SiStripMonitorSummary/test/DBReader_conddbmonitoring_generic_cfg.py print logDestination=$LOGDESTINATION outputRootFile=$ROOTFILE connectionString=frontier://$FRONTIER/$ACCOUNT recordName=$RECORD recordForQualityName=$RECORDFORQUALITY tagName=$tag runNumber=$IOV_number LatencyMon=$MONITOR_LATENCY ALCARecoTriggerBitsMon=$MONITOR_ALCARECOTRIGGERBITS ShiftAndCrosstalkMon=$MONITOR_SHIFTANDCROSSTALK PedestalMon=$MONITOR_PEDESTAL NoiseMon=$MONITOR_NOISE QualityMon=$MONITOR_QUALITY CablingMon=$MONITOR_CABLING GainMon=$MONITOR_GAIN LorentzAngleMon=$MONITOR_LA ThresholdMon=$MONITOR_THRESHOLD MonitorCumulative=$MONITORCUMULATIVE ActiveDetId=$USEACTIVEDETID"
+	$CMSRUNCOMMAND
 
-process.SiStripQualityESProducer = cms.ESProducer("SiStripQualityESProducer",
-   ReduceGranularity = cms.bool(False),
-   PrintDebugOutput = cms.bool(False),
-   UseEmptyRunInfo = cms.bool(False),
-   ListOfRecordToMerge = cms.VPSet(cms.PSet(
-   record = cms.string('$RECORD'),
-   tag = cms.string('')
-   ))
-)
+	afstokenchecker.sh "cmsRun finished. Now moving the files to the corresponding directories ..."
 
-process.stat = cms.EDFilter("SiStripQualityStatistics",
-    TkMapFileName = cms.untracked.string(''),
-    dataLabel = cms.untracked.string('')
-)
-
-process.e = cms.EndPath(process.stat)
+	cp ${CMSSW_BASE}/src/DQM/SiStripMonitorSummary/test/DBReader_conddbmonitoring_generic_cfg.py DBReader_cfg.py
+	cat >> DBReader_cfg.py << EOF 
+#
+# $CMSRUNCOMMAND
+#
 EOF
-	fi
 
-	if [ "$MONITOR_CABLING" = "True" ]; then
-	    if [ "$ACCOUNT" = "CMS_COND_21X_STRIP" ]; then # For CMSSW_2_x_y the FedCablingReader is not available!
-	    cat >> DBReader_cfg.py  << EOF
+	mv DBReader_cfg.py $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/cfg/${tag}_cfg.py
+	CFGISSAVED=True
 
-process.SiStripQualityESProducer = cms.ESProducer("SiStripQualityESProducer",
-   ReduceGranularity = cms.bool(False),
-   PrintDebugOutput = cms.bool(False),
-   UseEmptyRunInfo = cms.bool(False),
-   ListOfRecordToMerge = cms.VPSet(cms.PSet(
-   record = cms.string('$RECORDFORQUALITY'),
-   tag = cms.string('')
-   ))
-)
-
-process.sistripconn = cms.ESProducer("SiStripConnectivity")
-
-process.stat = cms.EDFilter("SiStripQualityStatistics",
-    TkMapFileName = cms.untracked.string(''),
-    dataLabel = cms.untracked.string('')
-)
-
-process.e = cms.EndPath(process.stat)
+	if [ "$NEWTAG" = "True" ]; then
+	    cat >> ${tag}_documentation << EOF
+<html>
+<body>
+<a href="https://twiki.cern.ch/twiki/bin/view/CMS/StripTrackerDBTagsForCalibrations#${tag}">https://twiki.cern.ch/twiki/bin/view/CMS/StripTrackerDBTagsForCalibrations#${tag}</a>
+</body>
+</html>
 EOF
-	    else
-	    cat >> DBReader_cfg.py  << EOF
 
-process.SiStripQualityESProducer = cms.ESProducer("SiStripQualityESProducer",
-   ReduceGranularity = cms.bool(False),
-   PrintDebugOutput = cms.bool(False),
-   UseEmptyRunInfo = cms.bool(False),
-   ListOfRecordToMerge = cms.VPSet(cms.PSet(
-   record = cms.string('$RECORDFORQUALITY'),
-   tag = cms.string('')
-   ))
-)
-
-process.sistripconn = cms.ESProducer("SiStripConnectivity")
-
-process.stat = cms.EDFilter("SiStripQualityStatistics",
-    TkMapFileName = cms.untracked.string(''),
-    dataLabel = cms.untracked.string('')
-)
-
-process.reader = cms.EDFilter("SiStripFedCablingReader")
-
-process.e = cms.EndPath(process.stat*process.reader)
-EOF
-	    fi
-	fi
-
-	echo "Executing cmsRun. Stay tuned ..."
-
-	cmsRun DBReader_cfg.py
-
-	echo "cmsRun finished. Now moving the files to the corresponding directories ..."
-
-	if [ "$NEWTAG" = "True" ] && [ "$CFGISSAVED" = "False" ]; then
-	    cp DBReader_cfg.py $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/cfg/${tag}_cfg.py
-	    CFGISSAVED=True
+	    mv ${tag}_documentation $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/Documentation;
 	fi
 
 	mv $ROOTFILE $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/rootfiles;
@@ -491,6 +525,24 @@ EOF
 	    mv QualityInfoFromCabling_Run${IOV_number}.txt $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/CablingLog/
 
 	    rm $LOGDESTINATION.log
+	fi
+
+	if [ "$MONITOR_LATENCY" = "True" ]; then
+	    cat $LOGDESTINATION.log | awk 'BEGIN{doprint=0}{if(match($0,"PrintSummary")!=0) doprint=1;if(match($0,"PrintDebug")!=0) doprint=1;if(match($0,"%MSG")!=0) {doprint=0;} if(doprint==1) print $0}' > LatencyInfo_Run${IOV_number}.txt
+	    mv LatencyInfo_Run${IOV_number}.txt $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/LatencyLog/
+
+	    rm $LOGDESTINATION.log
+	fi
+
+	if [ "$MONITOR_SHIFTANDCROSSTALK" = "True" ]; then
+	    cat $LOGDESTINATION.log | awk 'BEGIN{doprint=0}{if(match($0,"PrintSummary")!=0) doprint=1;if(match($0,"PrintDebug")!=0) doprint=1;if(match($0,"%MSG")!=0) {doprint=0;} if(doprint==1) print $0}' > ShiftAndCrosstalkInfo_Run${IOV_number}.txt
+	    mv ShiftAndCrosstalkInfo_Run${IOV_number}.txt $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/ShiftAndCrosstalkLog/
+
+	    rm $LOGDESTINATION.log
+	fi
+
+	if [ "$MONITOR_ALCARECOTRIGGERBITS" = "True" ]; then
+	    mv AlCaRecoTriggerBitsInfo_Run${IOV_number}.txt $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/AlCaRecoTriggerBitsLog/
 	fi
 
 	for Plot in `ls *.png | grep TIB`; do
@@ -585,9 +637,9 @@ EOF
     if [ "$NEWTAG" = "True" ] || [ "$NEWIOV" = "True" ]; then
 
 	if [ "$CREATETRENDS" = "True" ]; then
-	    echo "Creating the Trend Plots ..."
+	    afstokenchecker.sh "Creating the Trend Plots ..."
 
-	    ./getOfflineDQMData.sh $DB $ACCOUNT $TAGSUBDIR $tag
+	    getOfflineDQMData.sh $DB $ACCOUNT $TAGSUBDIR $tag
 
 	    for i in {1..4}; do
 		for Plot in `ls *.png | grep TIBLayer$i`; do
@@ -650,10 +702,8 @@ EOF
 
 	mv TrackerSummary.root $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/rootfiles;
 	rm -f TrackerPlots.root;
-	rm -f makePlots_cc.d makePlots_cc.so;
-	rm -f makeTKTrend_cc.d makeTKTrend_cc.so;
 
-	echo "Publishing the new tag $tag (or the new IOV) on the web ..."
+	afstokenchecker.sh "Publishing the new tag $tag (or the new IOV) on the web ..."
 
 	for i in {1..4}; do
 	    cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;

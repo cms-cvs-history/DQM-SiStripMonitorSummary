@@ -67,23 +67,20 @@ export outRootFileTK=./TrackerSummary.root
 # File with prettier plots
 export outRootPlotsTK=./TrackerPlots.root
 
-# Needed to run the root macro
-export ARCH=slc4_ia32_gcc34
-export ROOTSYS=/afs/cern.ch/sw/lcg/external/root/5.18.00/${ARCH}/root
-export PATH=${PATH}:${ROOTSYS}/bin
-export LD_LIBRARY_PATH=${ROOTSYS}/lib
+#if [[ -f $outFileTK ]]
+#then
+#  echo "ERROR: txt output file already exists. Exiting."
+#  exit 1;
+#fi
 
-if [[ -f $outFileTK ]]
-then
-  echo "ERROR: txt output file already exists. Exiting."
-  exit 1;
-fi
+#if [[ -f $outRootFileTK ]]
+#  then
+#  echo "ERROR: root output file already exists. Exiting."
+#  exit 1;
+#fi
 
-if [[ -f $outRootFileTK ]]
-  then
-  echo "ERROR: root output file already exists. Exiting."
-  exit 1;
-fi
+# Use the root installation defined above
+#source ${ROOTSYS}/bin/thisroot.sh
 
 # In order to make the for loop work properly, I insert underscores here, and transform them to spaces afterwards
 for partName0 in Tracker TIB TID TOB TEC TIB_Layer_1_ TIB_Layer_2_ TIB_Layer_3_ TIB_Layer_4_ TID+_Disk_1_ TID+_Disk_2_ TID+_Disk_3_ TID-_Disk_1_ TID-_Disk_2_ TID-_Disk_3_ TOB_Layer_1_ TOB_Layer_2_ TOB_Layer_3_ TOB_Layer_4_ TOB_Layer_5_ TOB_Layer_6_ TEC+_Disk_1_ TEC+_Disk_2_ TEC+_Disk_3_ TEC+_Disk_4_ TEC+_Disk_5_ TEC+_Disk_6_ TEC+_Disk_7_ TEC+_Disk_8_ TEC+_Disk_9_ TEC-_Disk_1_ TEC-_Disk_2_ TEC-_Disk_3_ TEC-_Disk_4_ TEC-_Disk_5_ TEC-_Disk_6_ TEC-_Disk_7_ TEC-_Disk_8_ TEC-_Disk_9_ ;
@@ -93,7 +90,7 @@ do
   if [[ $partName0 == "Tracker" || $partName0 == "TIB" || $partName0 == "TID" || $partName0 == "TOB" || $partName0 == "TEC" ]] ;
   then
     subDetName=$partName0
-    partType=""
+    partType="All"
     partNumber=0
   else
     subDetName=`echo $partName | awk '{print $1}'`
@@ -111,7 +108,7 @@ do
       if [[ $fileName =~ "^${baseName}"  && $(( `wc -l "$workdir/$fileName" | awk '{print $1}'` - 51 )) > 0 ]] ; # File name must start with this string and must have at least that many lines
       then
         # Extract run number from first row of file
-        runNumber=`head -n 1 "$workdir/$fileName" | awk '{print $NF}'`
+        runNumber=`head -n 1 "$workdir/$fileName" | awk '{print $6}'`
         line=`head -n 52 $workdir/$fileName | tail -n 44 | grep "$partName" | awk -F ":" '{print $2}'`
 #                echo $line
 #                echo $fileName
@@ -161,12 +158,12 @@ do
   cat $outFileTK | awk '{if(NR>1)print l;l=$0};END{if(NR>=1)printf("%s",l);}' > tmp.txt
   mv tmp.txt $outFileTK
   # Now we have the file with all the data for the given partName. Process it with the ROOT macro
-  root -l -b -q makeTKTrend.cc\+\(\"$outFileTK\",\"$outRootFileTK\",\"$subDetName\",\"$partType\",$partNumber\)
+  makeTKTrend $outFileTK $outRootFileTK $subDetName $partType $partNumber
   rm $outFileTK
 done
 
 # Run a macro that creates prettier plots
 if [[ -f $outRootFileTK ]] ;
 then
-  root -l -b -q makePlots.cc+\(\"$outRootFileTK\",\"$outRootPlotsTK\"\)
+    makePlots $outRootFileTK $outRootPlotsTK
 fi

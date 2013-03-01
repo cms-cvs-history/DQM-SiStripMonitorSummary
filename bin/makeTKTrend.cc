@@ -13,6 +13,34 @@
 #include "TH1F.h"
 #include "TFile.h"
 
+void makeTKTrend(const char* inFileName, const char* outFileName, std::string subDetName, std::string partName, const unsigned int partNumber);
+
+int main(int argc , char *argv[]) {
+
+  if(argc==6) {
+    char* inFileName = argv[1];
+    char* outFileName = argv[2];
+    char* subDetName = argv[3];
+    char* partName = argv[4];
+    int partNumber = atoi(argv[5]);
+
+    std::cout << "ready to make trend plots from " 
+	      << inFileName << " to " << outFileName << " for " 
+	      << subDetName << " " << partName << " " << partNumber << std::endl;
+
+    
+    int returncode = 0;
+    makeTKTrend(inFileName,outFileName,subDetName,partName,partNumber);
+
+    return  returncode;
+
+  }
+  else {std::cout << "Too few arguments: " << argc << std::endl; return -1; }
+
+  return -9;
+
+}
+
 void makeTKTrend(const char* inFileName, const char* outFileName, std::string subDetName, std::string partName, const unsigned int partNumber)
 {
   // Maps <Run number, nBad>
@@ -25,6 +53,8 @@ void makeTKTrend(const char* inFileName, const char* outFileName, std::string su
   
   std::ostringstream oss;
   
+  if(partName=="All") partName="";
+
 //   // Number of modules, fibers, APVs, strips for each tracker part
 //   std::vector< std::string > tkParts;
 //   tkParts.push_back("Tracker");

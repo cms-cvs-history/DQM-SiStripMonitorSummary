@@ -19,6 +19,7 @@ void setLegendStyle(TLegend* l, const unsigned int nColumns);
 void setPaveTextStyle(TPaveText* t, const bool isHorizontal=true);
 void fillNormFactorMaps();
 double findNormFactor(const std::string currentPlotType, const std::string currentPart, const bool stackOption);
+void makePlots(std::string inputFileName, std::string outputFileName);
 
 // Map with <name of tracker part, count of channels in the part>
 // It is static so it can be read by the functions fillNormFactorMaps() and findNormFactor(...)
@@ -30,6 +31,27 @@ static std::map<std::string, unsigned int> APVsStackNormFactors;
 static std::map<std::string, unsigned int> APVsNoStackNormFactors;
 static std::map<std::string, unsigned int> stripsStackNormFactors;
 static std::map<std::string, unsigned int> stripsNoStackNormFactors;
+
+int main(int argc , char *argv[]) {
+
+  if(argc==3) {
+    char* inputFileName = argv[1];
+    char* outputFileName = argv[2];
+
+    std::cout << "ready to make plots from " << inputFileName << " to " << outputFileName << std::endl;
+
+    
+    int returncode = 0;
+    makePlots(inputFileName,outputFileName);
+
+    return  returncode;
+
+  }
+  else {std::cout << "Too few arguments: " << argc << std::endl; return -1; }
+
+  return -9;
+
+}
 
 
 void makePlots(std::string inputFileName, std::string outputFileName)
@@ -104,38 +126,65 @@ void makePlots(std::string inputFileName, std::string outputFileName)
     
     histoName = "h" + *itPlot + "Tracker";
     hTracker = (TH1F*)inputFile->Get(histoName.c_str());
-    hTracker->Scale(1/findNormFactor(*itPlot,"Tracker",stackHistograms));
+    if(hTracker) {
+      hTracker->Scale(1/findNormFactor(*itPlot,"Tracker",stackHistograms));
+    }
+    else {std::cout << histoName << " not found" << std::endl;}
+
     histoStack = new THStack(histoName.c_str(), histoName.c_str());
+
     histoName = "h" + *itPlot + "TIB";
     hTIB = (TH1F*)inputFile->Get(histoName.c_str());
-    hTIB->Scale(1/findNormFactor(*itPlot,"TIB",stackHistograms));
+    if(hTIB) {
+      hTIB->Scale(1/findNormFactor(*itPlot,"TIB",stackHistograms));
+    }
+    else {std::cout << histoName << " not found" << std::endl;}
     
     histoName = "h" + *itPlot + "TID";
     hTID = (TH1F*)inputFile->Get(histoName.c_str());
-    hTID->Scale(1/findNormFactor(*itPlot,"TID",stackHistograms));
+    if(hTID) {
+      hTID->Scale(1/findNormFactor(*itPlot,"TID",stackHistograms));
+    }
+    else {std::cout << histoName << " not found" << std::endl;}
+
     histoName = "h" + *itPlot + "TOB";
     hTOB = (TH1F*)inputFile->Get(histoName.c_str());
-    hTOB->Scale(1/findNormFactor(*itPlot,"TOB",stackHistograms));
+    if(hTOB) {
+      hTOB->Scale(1/findNormFactor(*itPlot,"TOB",stackHistograms));
+    }
+    else {std::cout << histoName << " not found" << std::endl;}
+
     histoName = "h" + *itPlot + "TEC";
     hTEC = (TH1F*)inputFile->Get(histoName.c_str());
-    hTEC->Scale(1/findNormFactor(*itPlot,"TEC",stackHistograms));
+    if(hTEC) {
+      hTEC->Scale(1/findNormFactor(*itPlot,"TEC",stackHistograms));
+    }
+    else {std::cout << histoName << " not found" << std::endl;}
     
     c1 = new TCanvas(("c"+*itPlot+"Tracker").c_str(), "", 1200, 600);
     setCanvasStyle(c1, false);
     //     hTracker->Draw();
-    setHistoStackStyle(hTracker,1);
+    if(hTracker) setHistoStackStyle(hTracker,1);
     //     hTIB->Draw("same");
-    setHistoStackStyle(hTIB,2);
-    histoStack->Add(hTIB);
+    if(hTIB) {
+      setHistoStackStyle(hTIB,2);
+      histoStack->Add(hTIB);
+    }
     //     hTID->Draw("same");
-    setHistoStackStyle(hTID,3);
-    histoStack->Add(hTID);
+    if(hTID) {
+      setHistoStackStyle(hTID,3);
+      histoStack->Add(hTID);
+    }
     //     hTOB->Draw("same");
-    setHistoStackStyle(hTOB,4);
-    histoStack->Add(hTOB);
+    if(hTOB) {
+      setHistoStackStyle(hTOB,4);
+      histoStack->Add(hTOB);
+    }
     //     hTEC->Draw("same");
-    setHistoStackStyle(hTEC,6);
-    histoStack->Add(hTEC);
+    if(hTEC) {
+      setHistoStackStyle(hTEC,6);
+      histoStack->Add(hTEC);
+    }
     // Bug in ROOT? If we plot a stack with the "stack" option and the Y axis is in log scale,
     // but there are no entries in any of the histograms of the stack, then ROOT crashes
     // Workaround: at this stage, check that at least one histogram has >0 entries,
@@ -298,50 +347,53 @@ void makePlots(std::string inputFileName, std::string outputFileName)
           histoName = "h" + *itPlot + *itSub + layerName + oss.str();
 //           std::cout << "histoName = " << histoName.c_str() << std::endl;
           histo = (TH1F*)inputFile->Get(histoName.c_str());
-          histo2 = new TH1F(*histo);
-          histo->Scale(1/findNormFactor(*itPlot, *itSub + " " + layerName + " " + oss.str(), false));
-          histo2->Scale(1/findNormFactor(*itPlot, *itSub + " " + layerName + " " + oss.str(), stackHistograms));
-          // First: plot histogram separately
-          setHistoStyle(histo);
-          c2 = new TCanvas(("c" + *itPlot + *itSub +  layerName + oss.str()).c_str(), "", 1200, 600);
-          setCanvasStyle(c2, true);
-          histo->Draw(plotHistoOptions.c_str());
-	  double histoMaximum = histo->GetMaximum();
-	  // Otherwise it does not draw the pad
-	  if(histoMaximum==0)
-	  {
-	    c2->SetLogy(0);
+	  if(histo) {
+	    histo2 = new TH1F(*histo);
+	    histo->Scale(1/findNormFactor(*itPlot, *itSub + " " + layerName + " " + oss.str(), false));
+	    histo2->Scale(1/findNormFactor(*itPlot, *itSub + " " + layerName + " " + oss.str(), stackHistograms));
+	    // First: plot histogram separately
+	    setHistoStyle(histo);
+	    c2 = new TCanvas(("c" + *itPlot + *itSub +  layerName + oss.str()).c_str(), "", 1200, 600);
+	    setCanvasStyle(c2, true);
+	    histo->Draw(plotHistoOptions.c_str());
+	    double histoMaximum = histo->GetMaximum();
+	    // Otherwise it does not draw the pad
+	    if(histoMaximum==0)
+	      {
+		c2->SetLogy(0);
+	      }
+	    legend2 = new TLegend(0.6,0.92,0.9,0.97);
+	    legend2->AddEntry(histo,(*itSub + layerName + oss.str()).c_str());
+	    setLegendStyle(legend2, 1);
+	    legend2->Draw();
+	    textX = new TPaveText();
+	    textY = new TPaveText();
+	    setPaveTextStyle(textX);
+	    setPaveTextStyle(textY,false);
+	    textX->Draw();
+	    textY->Draw();
+	    gSystem->ProcessEvents();
+	    c2->Update();
+	    outputFile->cd();
+	    c2->Write();
+	    c2->SaveAs((*itPlot + *itSub + layerName + oss.str() + ".png").c_str());
+	    delete textX;
+	    delete textY;
+	    delete legend2;
+	    delete c2;
+	    
+	    // Second: add histogram to THStack
+	    setHistoStyle(histo2);
+	    hLayers.push_back(histo2);
+	    setHistoStackStyle(hLayers.back(), iLayer);
+	    histoStack->Add(hLayers.back());
+	    entryLabel = *itSub + " " + layerName + " " + oss.str();
+	    legend->AddEntry(hLayers.back(), entryLabel.c_str());
+	    //           hLayers.back()->Draw("same");
+	    //         }
+	    //           delete histo2;
 	  }
-          legend2 = new TLegend(0.6,0.92,0.9,0.97);
-          legend2->AddEntry(histo,(*itSub + layerName + oss.str()).c_str());
-          setLegendStyle(legend2, 1);
-          legend2->Draw();
-          textX = new TPaveText();
-          textY = new TPaveText();
-          setPaveTextStyle(textX);
-          setPaveTextStyle(textY,false);
-          textX->Draw();
-          textY->Draw();
-          gSystem->ProcessEvents();
-          c2->Update();
-          outputFile->cd();
-          c2->Write();
-          c2->SaveAs((*itPlot + *itSub + layerName + oss.str() + ".png").c_str());
-          delete textX;
-          delete textY;
-          delete legend2;
-          delete c2;
-
-          // Second: add histogram to THStack
-          setHistoStyle(histo2);
-          hLayers.push_back(histo2);
-          setHistoStackStyle(hLayers.back(), iLayer);
-          histoStack->Add(hLayers.back());
-          entryLabel = *itSub + " " + layerName + " " + oss.str();
-          legend->AddEntry(hLayers.back(), entryLabel.c_str());
-          //           hLayers.back()->Draw("same");
-//         }
-//           delete histo2;
+	  else {std::cout << histoName << " not found" << std::endl;}
       }
       histoStack->Draw(plotStackOptions.c_str());
 

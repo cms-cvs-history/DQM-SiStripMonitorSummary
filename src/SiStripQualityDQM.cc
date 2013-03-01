@@ -248,7 +248,7 @@ void SiStripQualityDQM::fillGrandSummaryMEs(){
   for(;idet!=detids.end();++idet){
     ss << "detid " << (*idet) << " IsModuleUsable " << qualityHandle_->IsModuleUsable((*idet)) << "\n";
   }
-  LogDebug("SiStripQualityStatistics") << ss.str() << std::endl;
+  LogDebug("SiStripQualityDQM") << ss.str() << std::endl;
 
 
   std::vector<SiStripQuality::BadComponent> BC = qualityHandle_->getBadComponentList();
@@ -444,7 +444,7 @@ void SiStripQualityDQM::fillGrandSummaryMEs(){
     ss << "\nTEC- Disk " << i-9 << " :" << ssV[3][i].str();
 
 
-  edm::LogInfo("SiStripQualityStatistics") << ss.str() << std::endl;
+  edm::LogInfo("SiStripQualityDQM") << ss.str() << std::endl;
 
   for (int i=0; i<4; i++){
     TCanvas c1("c1");

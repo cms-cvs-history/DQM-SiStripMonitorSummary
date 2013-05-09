@@ -1,11 +1,15 @@
 #!/bin/bash
 
+# needed to allow the loop on *.png without using "*.png" as value
+shopt -s nullglob
 date
 
 if [ $# -ne 5 ]; then
-    echo "You have to provide a <DB>, an <Account>, a <GTAccount>, a <RunInfoAccount> and the <FrontierPath> !!!"
+    afstokenchecker.sh "You have to provide a <DB>, an <Account>, a <GTAccount>, a <RunInfoAccount> and the <FrontierPath> !!!"
     exit
 fi
+
+afstokenchecker.sh "Starting execution of Monitor_RunInfo $1 $2 $3 $4 $5"
 
 #Example: DB=cms_orcoff_prod
 DB=$1
@@ -32,7 +36,7 @@ CreateIndex ()
     COUNTER=0
     LASTUPDATE=`date`
 
-    for Plot in `ls *.png`; do
+    for Plot in *.png; do
 	if [[ $COUNTER%2 -eq 0 ]]; then
 	    cat >> index_new.html  << EOF
 <TR> <TD align=center> <a href="$Plot"><img src="$Plot"hspace=5 vspace=5 border=0 style="width: 90%" ALT="$Plot"></a> 
@@ -48,26 +52,30 @@ EOF
 	let COUNTER++
     done
 
-    cat /afs/cern.ch/cms/tracker/sistrcalib/WWW/template_index_foot.html | sed -e "s@insertDate@$LASTUPDATE@g" >> index_new.html
+    cat ${CMSSW_BASE}/src/DQM/SiStripMonitorSummary/data/template_index_foot.html | sed -e "s@insertDate@$LASTUPDATE@g" >> index_new.html
 
     mv -f index_new.html index.html
 }
 
 # Creation of all needed directories if not existing yet
 if [ ! -d "$STORAGEPATH/$DB" ]; then 
-    echo "Creating directory $STORAGEPATH/$DB"
+    afstokenchecker.sh "Creating directory $STORAGEPATH/$DB"
     mkdir $STORAGEPATH/$DB;
 fi
 
 if [ ! -d "$STORAGEPATH/$DB/$ACCOUNT" ]; then 
-    echo "Creating directory $STORAGEPATH/$DB/$ACCOUNT"
+    afstokenchecker.sh "Creating directory $STORAGEPATH/$DB/$ACCOUNT"
     mkdir $STORAGEPATH/$DB/$ACCOUNT; 
 fi
 
 if [ ! -d "$STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR" ]; then 
-    echo "Creating directory $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR"
+    afstokenchecker.sh "Creating directory $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR"
     mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR; 
 fi
+
+# Array of already analyzed tags
+
+declare -a checkedtags;
 
 # Access of all Global Tags contained in the given DB account
 cmscond_tagtree_list -c frontier://cmsfrontier.cern.ch:8000/$FRONTIER/$GTACCOUNT -P /afs/cern.ch/cms/DB/conddb | grep tree | awk '{print $2}' > $GLOBALTAGCOLLECTION
@@ -76,67 +84,78 @@ cmscond_tagtree_list -c frontier://cmsfrontier.cern.ch:8000/$FRONTIER/$GTACCOUNT
 MONITOR_QUALITY=True
 TAGSUBDIR=RunInfo
 LOGDESTINATION=Reader
+QUALITYLOGDEST=QualityInfo
 CREATETRENDS=True
 MONITORCUMULATIVE=False
 
 # Loop on all Global Tags
 for globaltag in `cat $GLOBALTAGCOLLECTION`; do
 
-    echo "Processing Global Tag $globaltag";
+    afstokenchecker.sh "Processing Global Tag $globaltag";
 
     NEWTAG=False
     NEWIOV=False
     CFGISSAVED=False
 
-    if [ `cmscond_tagtree_list -c frontier://cmsfrontier.cern.ch:8000/$FRONTIER/$GTACCOUNT -P /afs/cern.ch/cms/DB/conddb -T $globaltag | grep runinfo | grep $RUNINFOACCOUNT | wc -w` -eq 0 ]; then
+    RUNINFOTAGANDOBJECT=`cmscond_tagtree_list -c frontier://cmsfrontier.cern.ch:8000/$FRONTIER/$GTACCOUNT -P /afs/cern.ch/cms/DB/conddb -T $globaltag | grep runinfo | grep $RUNINFOACCOUNT | awk '{printf "%s %s",$3,$5}'`
+
+    if [ `echo $RUNINFOTAGANDOBJECT | wc -w` -eq 0 ]; then
 	continue
     fi
 
-    if [ `cmscond_tagtree_list -c frontier://cmsfrontier.cern.ch:8000/$FRONTIER/$GTACCOUNT -P /afs/cern.ch/cms/DB/conddb -T $globaltag | grep SiStripFedCabling | grep $ACCOUNT | wc -w` -eq 0 ]; then
+    CABLINGTAGANDOBJECT=`cmscond_tagtree_list -c frontier://cmsfrontier.cern.ch:8000/$FRONTIER/$GTACCOUNT -P /afs/cern.ch/cms/DB/conddb -T $globaltag | grep SiStripFedCabling | grep $ACCOUNT | awk '{printf "%s %s",$3,$5}'`
+
+    if [ `echo $CABLINGTAGANDOBJECT | wc -w` -eq 0 ]; then
 	continue
     fi
 
-    RUNINFOTAG=`cmscond_tagtree_list -c frontier://cmsfrontier.cern.ch:8000/$FRONTIER/$GTACCOUNT -P /afs/cern.ch/cms/DB/conddb -T $globaltag | grep runinfo | awk '{print $3}' | sed -e "s@tag:@@g"`
+    RUNINFOTAG=`echo $RUNINFOTAGANDOBJECT | awk '{print $1}' | sed -e "s@tag:@@g"`
+    RUNINFOOBJECT=`echo $RUNINFOTAGANDOBJECT | awk '{print $2}' | sed -e "s@object:@@g"`
 
-    CABLINGTAG=`cmscond_tagtree_list -c frontier://cmsfrontier.cern.ch:8000/$FRONTIER/$GTACCOUNT -P /afs/cern.ch/cms/DB/conddb -T $globaltag | grep SiStripFedCabling | awk '{print $3}' | sed -e "s@tag:@@g"`
+    CABLINGTAG=`echo $CABLINGTAGANDOBJECT | awk '{print $1}' | sed -e "s@tag:@@g"`
+    CABLINGOBJECT=`echo $CABLINGTAGANDOBJECT | awk '{print $2}' | sed -e "s@object:@@g"`
 
     tag=${RUNINFOTAG}_${CABLINGTAG}
+    # check if $tag contains blank and if so, issue a warning
+    if [ `expr index "$tag" " "` -ne 0 ]; then
+	afstokenchecker.sh "WARNING!! $tag has blank spaces"
+    fi
 
     # Creation of DB-Tag directory if not existing yet
     if [ ! -d "$STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR" ]; then 
-	echo "Creating directory $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR"
+	afstokenchecker.sh "Creating directory $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR"
 	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR; 
     fi
 
     if [ ! -d "$STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag" ]; then 
-	echo "Creating directory $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag"
+	afstokenchecker.sh "Creating directory $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag"
 	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag;
 
 	NEWTAG=True
     fi
 
     if [ ! -d "$STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/RelatedGlobalTags" ]; then 
-	echo "Creating directory $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/RelatedGlobalTags"
+	afstokenchecker.sh "Creating directory $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/RelatedGlobalTags"
 	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/RelatedGlobalTags;
     fi
 
     # Creation of Global Tag directory if not existing yet
     if [ ! -d "$STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR" ]; then 
-	echo "Creating directory $STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR"
+	afstokenchecker.sh "Creating directory $STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR"
 	mkdir $STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR;
     fi
 
     if [ ! -d "$STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR/$globaltag" ]; then 
-	echo "Creating directory $STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR/$globaltag"
+	afstokenchecker.sh "Creating directory $STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR/$globaltag"
 	mkdir $STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR/$globaltag;
     fi
 
     # Creation of links between the DB-Tag and the respective Global Tags
     cd $STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR/$globaltag;
-    if [ -f $RUNINFOTAG ]; then
-	rm $RUNINFOTAG;
+    if [ -f $tag ]; then
+	rm $tag;
     fi
-    cat >> $RUNINFOTAG << EOF
+    cat >> $tag << EOF
 <html>
 <body>
 <a href="https://test-stripdbmonitor.web.cern.ch/test-stripdbmonitor/CondDBMonitoring/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag">https://test-stripdbmonitor.web.cern.ch/test-stripdbmonitor/CondDBMonitoring/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag</a>
@@ -158,13 +177,28 @@ EOF
     #ln -s $STORAGEPATH/$DB/$ACCOUNT/$GLOBALTAGDIR/$globaltag $globaltag;
     cd $WORKDIR;
 
+# check if the tag has been analyzed already
+
+    ALREADYCHECKED=0;
+
+    for checkedtag in ${checkedtags[*]}; do
+	if [ $checkedtag == $tag ]; then
+	    ALREADYCHECKED=1
+	fi
+    done
+
+    if [ $ALREADYCHECKED -eq 1 ]; then
+	date "+[%c] Tags $tag already checked: skip"
+	continue
+    fi
+
+    checkedtags[${#checkedtags[*]}]=$tag;
 
     # Get the list of IoVs for the given DB-Tag
-    #cmscond_list_iov -c oracle://$DB/$ACCOUNT -P /afs/cern.ch/cms/DB/conddb -t $tag | awk '{if(NR>4) print "Run_In "$1 " Run_End " $2}' > list_Iov.txt  # Access via oracle
-    cmscond_list_iov -c frontier://$FRONTIER/$RUNINFOACCOUNT -P /afs/cern.ch/cms/DB/conddb -t $RUNINFOTAG | awk '{if(NR>4 && $1!="Total" && $1<100000000) print "Run_In "$1 " Run_End " $2}' > list_Iov.txt # Access via Frontier
+    iov_list_tag.py -c frontier://cmsfrontier.cern.ch:8000/$FRONTIER/$RUNINFOACCOUNT -P /afs/cern.ch/cms/DB/conddb -t $RUNINFOTAG  > list_Iov.txt # Access via Frontier
 
     # Access DB for the given DB-Tag and dump histograms in .png if not existing yet
-    echo "Now the values are retrieved from the DB..."
+    afstokenchecker.sh "Now the values are retrieved from the DB..."
     
     if [ ! -d "$STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/rootfiles" ]; then
 	mkdir $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/rootfiles;
@@ -265,22 +299,31 @@ EOF
 
     fi
 
-    if [ `ls *.png | wc -w` -gt 0 ]; then
+    if [ `echo *.png | wc -w` -gt 0 ]; then
 	rm *.png;
     fi
 
     # Produce only the cfg. The whole Monitoring of all IOVs is too much!!!
-    if [ -f $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/cfg/${tag}_cfg.py ]; then # Skip Tags already processed. Take only new ones.
+    if [ "$NEWTAG" = "True" ]; then # Skip Tags already processed. Take only new ones.
+	afstokenchecker.sh "New Tag $tag found. Being processed..."
+	CMSRUNCOMMAND="cmsRun ${CMSSW_BASE}/src/DQM/SiStripMonitorSummary/test/RunInfo_conddbmonitoring_cfg.py print logDestination=$LOGDESTINATION qualityLogDestination=$QUALITYLOGDEST runInfoTag=$RUNINFOTAG cablingTag=$CABLINGTAG cablingConnectionString=frontier://$FRONTIER/$ACCOUNT runinfoConnectionString=frontier://$FRONTIER/$RUNINFOACCOUNT MonitorCumulative=$MONITORCUMULATIVE"  
+#outputRootFile=$ROOTFILE 
+#runNumber=$IOV_number
+
+	cp ${CMSSW_BASE}/src/DQM/SiStripMonitorSummary/test/RunInfo_conddbmonitoring_cfg.py RunInfo_cfg.py 
+	cat >> RunInfo_cfg.py <<EOF
+#
+# $CMSRUNCOMMAND
+#
+EOF
+	mv RunInfo_cfg.py $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/cfg/${tag}_cfg.py
 	continue
     else
-	echo "New Tag $tag found. Being processed..."
-	cat template_DBReaderRunInfo_cfg.py | sed -e "s@insertLog@$LOGDESTINATION@g" -e "s@insertDB@$DB@g" -e "s@insertFrontier@$FRONTIER@g" -e "s@insertInfoAccount@$RUNINFOACCOUNT@g" -e "s@insertCablingAccount@$ACCOUNT@g" -e "s@insertInfoTag@$RUNINFOTAG@g" -e "s@insertCablingTag@$CABLINGTAG@g" -e "s@insertOutFile@$ROOTFILE@g" -e "s@insertMonitorCumulative@$MONITORCUMULATIVE@g"> DBReader_cfg.py
-	cp DBReader_cfg.py $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/cfg/${tag}_cfg.py
 	continue
     fi
 
 #    # Process each IOV of the given DB-Tag seperately
-#    for IOV_number in `grep Run_In list_Iov.txt | awk '{print $2}'`; do
+#    for IOV_number in `cat list_Iov.txt`; do
 #
 #	if [ "$IOV_number" = "Total" ] || [ $IOV_number -gt 100000000 ]; then
 #	    continue
@@ -292,17 +335,17 @@ EOF
 #	    continue
 #	fi
 #
-#	echo "New IOV $IOV_number found. Being processed..."
+#	afstokenchecker.sh "New IOV $IOV_number found. Being processed..."
 #
 #	NEWIOV=True
 #
 #	cat template_DBReaderRunInfo_cfg.py | sed -e "s@insertRun@$IOV_number@g" -e "s@insertLog@$LOGDESTINATION@g" -e "s@insertDB@$DB@g" -e "s@insertFrontier@$FRONTIER@g" -e "s@insertInfoAccount@$RUNINFOACCOUNT@g" -e "s@insertCablingAccount@$ACCOUNT@g" -e "s@insertInfoTag@$RUNINFOTAG@g" -e "s@insertCablingTag@$CABLINGTAG@g" -e "s@insertOutFile@$ROOTFILE@g" -e "s@insertMonitorCumulative@$MONITORCUMULATIVE@g"> DBReader_cfg.py
 #
-#	echo "Executing cmsRun. Stay tuned ..."
+#	afstokenchecker.sh "Executing cmsRun. Stay tuned ..."
 #
 #	cmsRun DBReader_cfg.py
 #
-#	echo "cmsRun finished. Now moving the files to the corresponding directories ..."
+#	afstokenchecker.sh "cmsRun finished. Now moving the files to the corresponding directories ..."
 #
 #	if [ "$NEWTAG" = "True" ] && [ "$CFGISSAVED" = "False" ]; then
 #	    cp DBReader_cfg.py $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/cfg/${tag}_cfg.py
@@ -422,9 +465,10 @@ EOF
 #    if [ "$NEWTAG" = "True" ] || [ "$NEWIOV" = "True" ]; then
 #
 #	if [ "$CREATETRENDS" = "True" ]; then
-#	    echo "Creating the Trend Plots ..."
+#	    afstokenchecker.sh "Creating the Trend Plots ..."
 #
 #	    ./getOfflineDQMData.sh $DB $ACCOUNT $TAGSUBDIR $tag
+#	    getOfflineDQMData.sh $DB $ACCOUNT $TAGSUBDIR $tag
 #
 #	    for i in {1..4}; do
 #		for Plot in `ls *.png | grep TIBLayer$i`; do
@@ -490,11 +534,11 @@ EOF
 #	rm -f makePlots_cc.d makePlots_cc.so;
 #	rm -f makeTKTrend_cc.d makeTKTrend_cc.so;
 #
-#	echo "Publishing the new tag $tag (or the new IOV) on the web ..."
+#	afstokenchecker.sh "Publishing the new tag $tag (or the new IOV) on the web ..."
 #
 #	for i in {1..4}; do
 #	    cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-#	    cat template_index_header.html | sed -e "s@insertPageName@$tag --- TIB Layer $i --- Summary Report@g" > index_new.html
+#	    cat ${CMSSW_BASE}/src/DQM/SiStripMonitorSummary/data/template_index_header.html  | sed -e "s@insertPageName@$tag --- TIB Layer $i --- Summary Report@g" > index_new.html
 #	    if [ "$MONITORCUMULATIVE" = "True" ] || [ "$CREATETRENDS" = "True" ]; then
 #		cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB/Layer$i/Profile;
 #		CreateIndex
@@ -516,7 +560,7 @@ EOF
 #
 #	for i in {1..6}; do
 #	    cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-#	    cat template_index_header.html | sed -e "s@insertPageName@$tag --- TOB Layer $i --- Summary Report@g" > index_new.html
+#	    cat ${CMSSW_BASE}/src/DQM/SiStripMonitorSummary/data/template_index_header.html  | sed -e "s@insertPageName@$tag --- TOB Layer $i --- Summary Report@g" > index_new.html
 #	    if [ "$MONITORCUMULATIVE" = "True" ] || [ "$CREATETRENDS" = "True" ]; then
 #		cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Layer$i/Profile;
 #		CreateIndex
@@ -539,7 +583,7 @@ EOF
 #	for i in {1..2}; do
 #	    for j in {1..3}; do
 #		cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-#		cat template_index_header.html | sed -e "s@insertPageName@$tag --- TID Side $i Disk $j --- Summary Report@g" > index_new.html
+#		cat ${CMSSW_BASE}/src/DQM/SiStripMonitorSummary/data/template_index_header.html  | sed -e "s@insertPageName@$tag --- TID Side $i Disk $j --- Summary Report@g" > index_new.html
 #		if [ "$MONITORCUMULATIVE" = "True" ] || [ "$CREATETRENDS" = "True" ]; then
 #		    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side$i/Disk$j/Profile;
 #		    CreateIndex
@@ -563,7 +607,7 @@ EOF
 #	for i in {1..2}; do
 #	    for j in {1..9}; do
 #		cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-#		cat template_index_header.html | sed -e "s@insertPageName@$tag --- TEC Side $i Disk $j --- Summary Report@g" > index_new.html
+#		cat ${CMSSW_BASE}/src/DQM/SiStripMonitorSummary/data/template_index_header.html  | sed -e "s@insertPageName@$tag --- TEC Side $i Disk $j --- Summary Report@g" > index_new.html
 #		if [ "$MONITORCUMULATIVE" = "True" ] || [ "$CREATETRENDS" = "True" ]; then
 #		    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side$i/Disk$j/Profile;
 #		    CreateIndex
@@ -586,28 +630,28 @@ EOF
 #
 #	if [ "$CREATETRENDS" = "True" ]; then
 #	    cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-#	    cat template_index_header.html | sed -e "s@insertPageName@$tag --- Full Strip Tracker --- Trend Plots@g" > index_new.html
+#	    cat ${CMSSW_BASE}/src/DQM/SiStripMonitorSummary/data/template_index_header.html  | sed -e "s@insertPageName@$tag --- Full Strip Tracker --- Trend Plots@g" > index_new.html
 #	    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/Trends;
 #	    CreateIndex
 #
 #	    cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-#	    cat template_index_header.html | sed -e "s@insertPageName@$tag --- TIB --- Trend Plots@g" > index_new.html
+#	    cat ${CMSSW_BASE}/src/DQM/SiStripMonitorSummary/data/template_index_header.html  | sed -e "s@insertPageName@$tag --- TIB --- Trend Plots@g" > index_new.html
 #	    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TIB/Trends;
 #	    CreateIndex
 #
 #	    cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-#	    cat template_index_header.html | sed -e "s@insertPageName@$tag --- TOB --- Trend Plots@g" > index_new.html
+#	    cat ${CMSSW_BASE}/src/DQM/SiStripMonitorSummary/data/template_index_header.html  | sed -e "s@insertPageName@$tag --- TOB --- Trend Plots@g" > index_new.html
 #	    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TOB/Trends;
 #	    CreateIndex
 #
 #	    for i in {1..2}; do
 #		cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-#		cat template_index_header.html | sed -e "s@insertPageName@$tag --- TID Side $i --- Trend Plots@g" > index_new.html
+#		cat ${CMSSW_BASE}/src/DQM/SiStripMonitorSummary/data/template_index_header.html  | sed -e "s@insertPageName@$tag --- TID Side $i --- Trend Plots@g" > index_new.html
 #		cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TID/Side$i/Trends;
 #		CreateIndex
 #
 #		cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-#		cat template_index_header.html | sed -e "s@insertPageName@$tag --- TEC Side $i --- Trend Plots@g" > index_new.html
+#		cat ${CMSSW_BASE}/src/DQM/SiStripMonitorSummary/data/template_index_header.html  | sed -e "s@insertPageName@$tag --- TEC Side $i --- Trend Plots@g" > index_new.html
 #		cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TEC/Side$i/Trends;
 #		CreateIndex
 #	    done
@@ -615,22 +659,22 @@ EOF
 #
 #	if [ "$MONITOR_QUALITY" = "True" ]; then
 #	    cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-#	    cat template_index_header.html | sed -e "s@insertPageName@$tag --- Bad APVs --- Summary Report@g" > index_new.html
+#	    cat ${CMSSW_BASE}/src/DQM/SiStripMonitorSummary/data/template_index_header.html  | sed -e "s@insertPageName@$tag --- Bad APVs --- Summary Report@g" > index_new.html
 #	    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/Summary/BadAPVs;
 #	    CreateIndex
 #
 #	    cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-#	    cat template_index_header.html | sed -e "s@insertPageName@$tag --- Bad Fibers --- Summary Report@g" > index_new.html
+#	    cat ${CMSSW_BASE}/src/DQM/SiStripMonitorSummary/data/template_index_header.html  | sed -e "s@insertPageName@$tag --- Bad Fibers --- Summary Report@g" > index_new.html
 #	    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/Summary/BadFibers;
 #	    CreateIndex
 #	    
 #	    cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-#	    cat template_index_header.html | sed -e "s@insertPageName@$tag --- Bad Modules --- Summary Report@g" > index_new.html
+#	    cat ${CMSSW_BASE}/src/DQM/SiStripMonitorSummary/data/template_index_header.html  | sed -e "s@insertPageName@$tag --- Bad Modules --- Summary Report@g" > index_new.html
 #	    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/Summary/BadModules;
 #	    CreateIndex
 #
 #	    cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-#	    cat template_index_header.html | sed -e "s@insertPageName@$tag --- Bad Strips --- Summary Report@g" > index_new.html
+#	    cat ${CMSSW_BASE}/src/DQM/SiStripMonitorSummary/data/template_index_header.html  | sed -e "s@insertPageName@$tag --- Bad Strips --- Summary Report@g" > index_new.html
 #	    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/Summary/BadStrips;
 #	    CreateIndex
 #		
@@ -638,7 +682,7 @@ EOF
 #    
 #	if [ "$MONITOR_CABLING" = "True" ]; then
 #	    cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-#	    cat template_index_header.html | sed -e "s@insertPageName@$tag --- Summary Report@g" > index_new.html
+#	    cat ${CMSSW_BASE}/src/DQM/SiStripMonitorSummary/data/template_index_header.html  | sed -e "s@insertPageName@$tag --- Summary Report@g" > index_new.html
 #	    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/Summary/;
 #	    CreateIndex
 #		
@@ -646,7 +690,7 @@ EOF
 #
 #	if [ -d "$STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TrackerMap" ]; then
 #	    cd /afs/cern.ch/cms/tracker/sistrcalib/WWW;
-#	    cat template_index_header.html | sed -e "s@insertPageName@$tag --- Tracker Maps for all IOVs ---@g" > index_new.html
+#	    cat ${CMSSW_BASE}/src/DQM/SiStripMonitorSummary/data/template_index_header.html  | sed -e "s@insertPageName@$tag --- Tracker Maps for all IOVs ---@g" > index_new.html
 #	    cd $STORAGEPATH/$DB/$ACCOUNT/$DBTAGDIR/$TAGSUBDIR/$tag/plots/TrackerMap;
 #	    CreateIndex
 #

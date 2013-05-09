@@ -1,22 +1,91 @@
 import FWCore.ParameterSet.Config as cms
 
+import FWCore.ParameterSet.VarParsing as VarParsing
+
 process = cms.Process("Reader")
+
+options = VarParsing.VarParsing("analysis")
+
+options.register ('logDestination',
+                  "",
+                  VarParsing.VarParsing.multiplicity.singleton, # singleton or list
+                  VarParsing.VarParsing.varType.string,          # string, int, or float
+                  "log file")
+options.register ('qualityLogDestination',
+                  "",
+                  VarParsing.VarParsing.multiplicity.singleton, # singleton or list
+                  VarParsing.VarParsing.varType.string,          # string, int, or float
+                  "quality log file")
+options.register ('runInfoTag',
+                  "",
+                  VarParsing.VarParsing.multiplicity.singleton, # singleton or list
+                  VarParsing.VarParsing.varType.string,          # string, int, or float
+                  "RunInfo tag name")
+options.register ('cablingTag',
+                  "",
+                  VarParsing.VarParsing.multiplicity.singleton, # singleton or list
+                  VarParsing.VarParsing.varType.string,          # string, int, or float
+                  "cabling tag name")
+options.register ('cablingConnectionString',
+                  "",
+                  VarParsing.VarParsing.multiplicity.singleton, # singleton or list
+                  VarParsing.VarParsing.varType.string,          # string, int, or float
+                  "Cabling connection string")
+options.register ('runinfoConnectionString',
+                  "",
+                  VarParsing.VarParsing.multiplicity.singleton, # singleton or list
+                  VarParsing.VarParsing.varType.string,          # string, int, or float
+                  "RunInfo connection string")
+options.register ('MonitorCumulative',
+                  False,
+                  VarParsing.VarParsing.multiplicity.singleton, # singleton or list
+                  VarParsing.VarParsing.varType.bool,          # string, int, or float
+                  "Cumulative Monitoring?")
+options.register ('outputRootFile',
+                  "",
+                  VarParsing.VarParsing.multiplicity.singleton, # singleton or list
+                  VarParsing.VarParsing.varType.string,          # string, int, or float
+                  "output root file")
+options.register ('runNumber',
+                  0,
+                  VarParsing.VarParsing.multiplicity.singleton, # singleton or list
+                  VarParsing.VarParsing.varType.int,          # string, int, or float
+                  "run number")
+
+options.parseArguments()
 
 process.MessageLogger = cms.Service("MessageLogger",
     debugModules = cms.untracked.vstring(''),
-    insertLog = cms.untracked.PSet(
-        threshold = cms.untracked.string('INFO')
-    ),
-    destinations = cms.untracked.vstring('insertLog') #Reader.log, cout
+#    insertLog = cms.untracked.PSet(
+#        threshold = cms.untracked.string('INFO')
+#    ),
+                                    destinations = cms.untracked.vstring(options.logDestination,
+                                                                         options.qualityLogDestination
+#                                                                         options.cablingLogDestination,
+#                                                                         options.condLogDestination
+                                                                         ), #Reader, cout
+                                    categories = cms.untracked.vstring('SiStripQualityStatistics'
+#                                                                       'SiStripQualityDQM',
+#                                                                       'SiStripFedCablingReader',
+#                                                                       'DummyCondObjContentPrinter',
+                                                                       )
 )
+setattr(process.MessageLogger,options.logDestination,cms.untracked.PSet(threshold = cms.untracked.string('INFO')))
+setattr(process.MessageLogger,options.qualityLogDestination,cms.untracked.PSet(
+    threshold = cms.untracked.string('INFO'),
+    default = cms.untracked.PSet(limit=cms.untracked.int32(0)),
+    SiStripQualityStatistics = cms.untracked.PSet(limit=cms.untracked.int32(100000))
+#    SiStripQualityDQM = cms.untracked.PSet(limit=cms.untracked.int32(100000))
+    )
+        )
 
 process.maxEvents = cms.untracked.PSet(
     input = cms.untracked.int32(-1)
 )
 
 process.source = cms.Source("EmptyIOVSource",
-    firstValue = cms.uint64(insertRun),
-    lastValue = cms.uint64(insertRun),
+    firstValue = cms.uint64(options.runNumber),
+    lastValue = cms.uint64(options.runNumber),
     timetype = cms.string('runnumber'),
     interval = cms.uint64(1)
 )
@@ -24,14 +93,14 @@ process.source = cms.Source("EmptyIOVSource",
 process.poolDBESSourceRunInfo = cms.ESSource("PoolDBESSource",
    BlobStreamerName = cms.untracked.string('TBufferBlobStreamingService'),
    DBParameters = cms.PSet(
-        messageLevel = cms.untracked.int32(2),
+        messageLevel = cms.untracked.int32(1),  # it used to be 2
         authenticationPath = cms.untracked.string('/afs/cern.ch/cms/DB/conddb')
     ),
     timetype = cms.untracked.string('runnumber'),
-    connect = cms.string('frontier://insertFrontier/insertInfoAccount'),
+    connect = cms.string(options.runinfoConnectionString),
     toGet = cms.VPSet(cms.PSet(
         record = cms.string('RunInfoRcd'),
-        tag = cms.string('insertInfoTag')
+        tag = cms.string(options.runInfoTag)
         )               
                       )
 )
@@ -39,14 +108,14 @@ process.poolDBESSourceRunInfo = cms.ESSource("PoolDBESSource",
 process.poolDBESSourceFedCabling = cms.ESSource("PoolDBESSource",
    BlobStreamerName = cms.untracked.string('TBufferBlobStreamingService'),
    DBParameters = cms.PSet(
-        messageLevel = cms.untracked.int32(2),
+        messageLevel = cms.untracked.int32(1),
         authenticationPath = cms.untracked.string('/afs/cern.ch/cms/DB/conddb')
     ),
     timetype = cms.untracked.string('runnumber'),
-    connect = cms.string('frontier://insertFrontier/insertCablingAccount'),
+    connect = cms.string(options.cablingConnectionString),
     toGet = cms.VPSet(cms.PSet(
         record = cms.string('SiStripFedCablingRcd'),
-        tag = cms.string('insertCablingTag')
+        tag = cms.string(options.cablingTag)
         )               
                       )
 )
@@ -58,7 +127,7 @@ process.DQMStore = cms.Service("DQMStore",
 
 process.load("DQM.SiStripMonitorSummary.SiStripMonitorCondData_cfi")
 
-process.CondDataMonitoring.OutputFileName = 'insertOutFile'
+process.CondDataMonitoring.OutputFileName = options.outputRootFile
 process.CondDataMonitoring.MonitorSiStripPedestal      = False
 process.CondDataMonitoring.MonitorSiStripNoise         = False
 process.CondDataMonitoring.MonitorSiStripQuality       = True
@@ -70,7 +139,7 @@ process.CondDataMonitoring.MonitorSiStripHighThreshold = False
 process.CondDataMonitoring.OutputMEsInRootFile         = True
 process.CondDataMonitoring.FillConditions_PSet.OutputSummaryAtLayerLevelAsImage           = True
 process.CondDataMonitoring.FillConditions_PSet.OutputSummaryProfileAtLayerLevelAsImage    = False # This should be saved only in case of LA (because for LA no SummaryAtLayerLevel is available)
-process.CondDataMonitoring.FillConditions_PSet.OutputCumulativeSummaryAtLayerLevelAsImage = insertMonitorCumulative
+process.CondDataMonitoring.FillConditions_PSet.OutputCumulativeSummaryAtLayerLevelAsImage = options.MonitorCumulative
 process.CondDataMonitoring.FillConditions_PSet.HistoMaps_On     = False
 process.CondDataMonitoring.FillConditions_PSet.TkMap_On         = True # This is just for test until TkMap is included in all classes!!! Uncomment!!!!
 process.CondDataMonitoring.FillConditions_PSet.ActiveDetIds_On  = True # This should be set to False only for Lorentz Angle
@@ -92,6 +161,11 @@ process.CondDataMonitoring.SiStripLowThresholdDQM_PSet.CondObj_fillId  = 'onlyPr
 process.CondDataMonitoring.SiStripHighThresholdDQM_PSet.CondObj_fillId = 'onlyProfile'
 
 ## --- TkMap specific Configurable options:
+
+process.CondDataMonitoring.SiStripQualityDQM_PSet.TkMap_On     = True
+process.CondDataMonitoring.SiStripQualityDQM_PSet.TkMapName    = 'QualityTkMap.png'
+process.CondDataMonitoring.SiStripQualityDQM_PSet.minValue     = 0.
+process.CondDataMonitoring.SiStripQualityDQM_PSet.maxValue     = 100.
 
 process.CondDataMonitoring.SiStripCablingDQM_PSet.TkMap_On     = True
 process.CondDataMonitoring.SiStripCablingDQM_PSet.TkMapName    = 'CablingTkMap.png'
@@ -134,21 +208,22 @@ process.p1 = cms.Path(process.CondDataMonitoring)
 process.SiStripQualityESProducer = cms.ESProducer("SiStripQualityESProducer",
    ReduceGranularity = cms.bool(False),
    PrintDebugOutput = cms.bool(False),
-   UseEmptyRunInfo = cms.bool(False),
-   ListOfRecordToMerge = cms.VPSet(cms.PSet(
-   record = cms.string('RunInfoRcd'),
-   tag = cms.string('')
-   ),
-      cms.PSet(
-   record = cms.string('SiStripDetCablingRcd'),
-   tag = cms.string('')
-   )
+   UseEmptyRunInfo = cms.bool(True),
+   ListOfRecordToMerge = cms.VPSet(
+    cms.PSet(
+    record = cms.string('RunInfoRcd'),
+    tag = cms.string('')
+    ),
+    cms.PSet(
+    record = cms.string('SiStripDetCablingRcd'),
+    tag = cms.string('')
+    )
                                    )
 )
 
 process.sistripconn = cms.ESProducer("SiStripConnectivity")
 
-process.stat = cms.EDFilter("SiStripQualityStatistics",
+process.stat = cms.EDAnalyzer("SiStripQualityStatistics",
     TkMapFileName = cms.untracked.string(''),
     dataLabel = cms.untracked.string('')
 )
